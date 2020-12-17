@@ -29,7 +29,6 @@ proof
     moreover have "S (replicate n a @ as) \<Longrightarrow> S (replicate (Suc n) a @ b # as)"
     proof (induction "replicate n a @ as" arbitrary: n as rule:S.induct)
       case 1
-      hence "n = 0 \<and> as = []" by simp
       thus ?case using S.intros(1) S.intros(2) by fastforce
     next
       case (2 w)
@@ -44,14 +43,14 @@ proof
         thus ?thesis using 0 by simp 
       next
         case (Suc n_1)
-        with "2.hyps"(3) have "w @ [b] = replicate n_1 a @ as"
-          by (metis append_Cons list.inject replicate_Suc)
-        moreover hence as:"as = take (length as - 1) as @ [b]"
+        let ?as_front = "take (length as - 1) as"
+        from "2.hyps"(3) Suc have "w @ [b] = replicate n_1 a @ as" by simp
+        moreover hence as:"as = ?as_front @ [b]"
           by (metis (mono_tags, lifting) alpha.distinct(1) append_Nil2 butlast_conv_take empty_replicate last_appendR last_replicate snoc_eq_iff_butlast)
-        ultimately have "w = replicate n_1 a @ take (length as - 1) as"
+        ultimately have "w = replicate n_1 a @ ?as_front"
           by (metis Nil_is_append_conv butlast_append butlast_snoc)
-        with "2.hyps"(2) Suc have "S (replicate n a @ b # take (length as - 1) as)" by simp
-        with S.intros(2) have "S (replicate (Suc n) a @ b # take (length as - 1) as @ [b])" by fastforce
+        with "2.hyps"(2) Suc have "S (replicate n a @ b # ?as_front)" by simp
+        with S.intros(2) have "S (replicate (Suc n) a @ b # ?as_front @ [b])" by fastforce
         with as show ?thesis by simp
       qed
     next
@@ -96,19 +95,19 @@ proof
   qed
 next
   have b_notS:"S (b # as) \<Longrightarrow> False" for as
-    proof (induction "b # as" arbitrary: as rule:S.induct)
-      case (3 x y)
-      show False
-      proof (cases x)
-        case Nil
-        with "3.hyps"(5) have "y = b # as" by simp
-        with "3.hyps"(4) show ?thesis by blast
-      next
-        case Cons
-        with "3.hyps"(5) have "x = b # drop 1 x" by simp
-        with "3.hyps"(2) show ?thesis by blast
-      qed
-    qed
+  proof (induction "b # as" arbitrary: as rule:S.induct)
+    case (3 x y)
+    show ?case
+    proof (cases x)
+      case Nil
+      with "3.hyps"(5) have "y = b # as" by simp
+      with "3.hyps"(4) show ?thesis by blast
+    next
+      case Cons
+      with "3.hyps"(5) have "x = b # drop 1 x" by simp
+      with "3.hyps"(2) show ?thesis by blast
+    qed 
+  qed
   have "\<not>balanced n w \<Longrightarrow> \<not> S(replicate n a @ w)"
   proof (induction n w rule:balanced.induct)
     case 1
@@ -198,11 +197,12 @@ next
         next
           case Cons
           let ?as_front = "take (length as - 1) as"
-          from "2.hyps"(3) have "w @ [b] = replicate n a @ b # as" by simp
+          have "\<lbrakk>d @ [b] = e @ b # f; f = g @ [b]\<rbrakk> \<Longrightarrow> d = e @ b # g" for d e f g by simp 
+          moreover from "2.hyps"(3) have "w @ [b] = replicate n a @ b # as" by simp
           moreover with Cons have as:"as = ?as_front @ [b]"
             by (metis append_butlast_last_id butlast_conv_take last.simps last_append list.distinct(1))
-          ultimately have "w = replicate n a @ b # ?as_front" using Cons
-            by (metis (no_types, lifting) Cons_replicate_eq butlast.simps(2) butlast_append butlast_snoc empty_replicate less_numeral_extra(3))
+          ultimately have "w = replicate n a @ b # ?as_front" by blast
+
           with "2.hyps"(2) Suc have "S (replicate n_1 a @ ?as_front)" by simp
           with S.intros(2) have "S (replicate (Suc n_1) a @ ?as_front @ [b])" by fastforce
           with Suc as show ?thesis by auto
@@ -236,26 +236,22 @@ next
         next
           assume asm:"length x \<ge> n + 2"
           let ?front = "(replicate (Suc n) a @ [b])"
+          let ?x_excess = "(length x - length ?front)"
           from "3.hyps"(5) have "x @ y = ?front @ as" by simp
-          moreover with asm have "length x \<ge> length ?front" by auto
-          ultimately have "x = ?front @ take (length x - length ?front) as"
+          moreover from asm have "length x \<ge> length ?front" by auto
+          ultimately have "x = ?front @ take ?x_excess as"
             by (metis append.right_neutral cancel_comm_monoid_add_class.diff_cancel dual_order.refl take_0 take_all take_append)
-          hence "x = replicate (Suc n) a @ b # take (length x - n - 2) as" by simp
-          with "3.hyps"(2) have almost_there:"S (replicate n a @ take (length x - n - 2) as)" by simp
-
-          from `x @ y = ?front @ as` `length x \<ge> length ?front`
-          have "y = drop (length x - length ?front) as"
+          with "3.hyps"(2) have "S (replicate n a @ take ?x_excess as)" by simp
+          moreover from `x @ y = ?front @ as` `length x \<ge> length ?front` have "y = drop ?x_excess as"
             by (metis append_eq_conv_conj drop_append drop_eq_Nil self_append_conv2)
-          with "3.hyps"(3) have "S (drop (length x - n - 2) as)" by simp
-          with almost_there S.intros(3) have "S (replicate n a @ take (length x - n - 2) as @ drop (length x - n - 2) as)" by fastforce
-          thus ?case by auto
+          ultimately show ?case using "3.hyps"(3) S.intros(3) by fastforce
         qed
       qed
     qed
     hence "\<not> S (replicate n a @ as) \<Longrightarrow> \<not> S (replicate (Suc n) a @ b # as)" by blast
     with "4.prems" "4.IH" show ?case by fastforce
   next
-    case (5 n as)
+    case 5
     thus ?case
       by (metis Cons_eq_appendI balanced.simps(5) replicate_Suc replicate_app_Cons_same)
   qed
