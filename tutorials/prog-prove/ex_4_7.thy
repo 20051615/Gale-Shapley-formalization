@@ -34,28 +34,25 @@ proof
     next
       case (2 w)
       show ?case
-      proof cases
-        assume "n = 0"
+      proof (cases n)
+        case 0
         with "2.hyps"(3) have "a # w @ [b] = as" by simp
         with S.intros(2) `S w` have "S as" by fastforce
 
-        from `n = 0` have goal:"replicate (Suc n) a @ b # as = a # [b] @ as" by simp
-
         from S.intros have "S (a # [b])" by fastforce
         with `S as` S.intros(3) have "S (a # [b] @ as)" by fastforce
-        thus ?case using goal by simp 
+        thus ?thesis using 0 by simp 
       next
-        assume "n \<noteq> 0"
-        with "2.hyps"(3) have "w @ [b] = replicate (n - 1) a @ as"
-          by (metis One_nat_def Suc_pred append_Cons list.inject not_gr_zero replicate_Suc)
-        moreover with `n \<noteq> 0` "2.hyps"(3) have w:"w = replicate (n - 1) a @ take (length as - 1) as"
-          by (smt alpha.distinct(1) append_is_Nil_conv butlast_append butlast_conv_take butlast_snoc last.simps last_append last_replicate)
-        ultimately have as:"as = take (length as - 1) as @ [b]" by simp
-
-        from "2.hyps"(2) w `n \<noteq> 0` have "S (replicate n a @ b # take (length as - 1) as)"
-          by (metis One_nat_def Suc_pred not_gr_zero)
+        case (Suc n_1)
+        with "2.hyps"(3) have "w @ [b] = replicate n_1 a @ as"
+          by (metis append_Cons list.inject replicate_Suc)
+        moreover hence as:"as = take (length as - 1) as @ [b]"
+          by (metis (mono_tags, lifting) alpha.distinct(1) append_Nil2 butlast_conv_take empty_replicate last_appendR last_replicate snoc_eq_iff_butlast)
+        ultimately have "w = replicate n_1 a @ take (length as - 1) as"
+          by (metis Nil_is_append_conv butlast_append butlast_snoc)
+        with "2.hyps"(2) Suc have "S (replicate n a @ b # take (length as - 1) as)" by simp
         with S.intros(2) have "S (replicate (Suc n) a @ b # take (length as - 1) as @ [b])" by fastforce
-        with as show ?case by simp
+        with as show ?thesis by simp
       qed
     next
       case (3 x y)
@@ -108,8 +105,7 @@ next
         with "3.hyps"(4) show ?thesis by blast
       next
         case Cons
-        hence "length x > 0" by simp
-        with "3.hyps"(5) have "x = b # drop 1 x" by (simp add: local.Cons)
+        with "3.hyps"(5) have "x = b # drop 1 x" by simp
         with "3.hyps"(2) show ?thesis by blast
       qed
     qed
@@ -127,23 +123,20 @@ next
     next
       case (2 w)
       from "2.hyps"(3) show ?case
-        by (metis alpha.distinct(1) last_ConsR last_replicate old.nat.distinct(2) snoc_eq_iff_butlast)
+        by (metis alpha.distinct(1) last_ConsR last_replicate nat.distinct(2) snoc_eq_iff_butlast)
     next
       case (3 x y)
-      from "3.hyps"(5) have x:"x = replicate (length x) a"
-        by (metis append_eq_append_conv length_append length_replicate replicate_add)
-      from "3.hyps"(5) have y:"y = replicate (length y) a"
-        by (metis append_eq_append_conv length_append length_replicate replicate_add)
-      from "3.hyps"(5) have x_y_length:"length x + length y = Suc n"
-        by (metis length_append length_replicate)
       show ?case
-      proof cases
-        assume "length x > 0"
-        with "3.hyps"(2) x show ?case by (metis Suc_pred)
+      proof (cases x)
+        case Nil
+        with "3.hyps"(5) have "y = replicate (Suc n) a" by simp
+        with "3.hyps"(4) show ?thesis by fastforce
       next
-        assume "\<not>length x > 0"
-        with x_y_length have "length y > 0" by simp
-        with "3.hyps"(4) y show ?case by (metis Suc_pred)
+        case Cons
+        from "3.hyps"(5) have "x = replicate (length x) a"
+          by (metis append_eq_append_conv length_append length_replicate replicate_add)
+        moreover with Cons have "length x = Suc (length x - 1)" by simp
+        ultimately show ?thesis using "3.hyps"(2) by metis
       qed
     qed
     thus ?case by auto
@@ -159,7 +152,7 @@ next
       thus ?case by blast
     next
       case (2 w)
-      thus ?case
+      show ?case
       proof (cases n)
         case 0
         show ?thesis
@@ -168,7 +161,7 @@ next
           with "2.hyps"(3) 0 have "as = []" by simp
           thus ?thesis using 0 S.intros(1) by simp
         next
-          case (Cons w_0 ws)
+          case Cons
           with "2.hyps"(3) 0 have "w = b # drop 1 w" by simp
           with b_notS "2.hyps"(1) have False by metis
           thus ?thesis by blast
@@ -200,17 +193,18 @@ next
         show ?thesis
         proof (cases as)
           case Nil
-          with "2.hyps"(3) have "w = replicate n a" by simp
-          with Suc "2.hyps"(1) as_notS show ?thesis by blast
+          with "2.hyps"(3) Suc have "w = replicate (Suc n_1) a" by simp
+          with "2.hyps"(1) as_notS show ?thesis by blast
         next
           case Cons
-          from "2.hyps"(3) Suc have "w @ [b] = replicate (Suc n_1) a @ b # as" by simp
-          moreover with Cons have as:"as = take (length as - 1) as @ [b]"
+          let ?as_front = "take (length as - 1) as"
+          from "2.hyps"(3) have "w @ [b] = replicate n a @ b # as" by simp
+          moreover with Cons have as:"as = ?as_front @ [b]"
             by (metis append_butlast_last_id butlast_conv_take last.simps last_append list.distinct(1))
-          ultimately have "w = replicate (Suc n_1) a @ b # take (length as - 1) as"
-            by (metis (no_types, lifting) Cons_replicate_eq butlast.simps(2) butlast_append butlast_snoc empty_replicate less_numeral_extra(3) local.Cons)
-          with "2.hyps"(2) have "S (replicate n_1 a @ take (length as - 1) as)" by simp
-          with S.intros(2) have "S (a # (replicate n_1 a @ take (length as - 1) as) @ [b])" by blast
+          ultimately have "w = replicate n a @ b # ?as_front" using Cons
+            by (metis (no_types, lifting) Cons_replicate_eq butlast.simps(2) butlast_append butlast_snoc empty_replicate less_numeral_extra(3))
+          with "2.hyps"(2) Suc have "S (replicate n_1 a @ ?as_front)" by simp
+          with S.intros(2) have "S (replicate (Suc n_1) a @ ?as_front @ [b])" by fastforce
           with Suc as show ?thesis by auto
         qed
       qed
@@ -228,8 +222,7 @@ next
         moreover from asm have "Suc n - length x > 0" by auto
         ultimately have "S (replicate (n - length x) a @ as)" using "3.hyps"(4)
           by (simp add: Suc_diff_le)
-        with S.intros(3) "3.hyps"(1) have "S (x @ replicate (n - length x) a @ as)" by auto
-        with x have "S (replicate (length x) a @ replicate (n - length x) a @ as)" by auto
+        with S.intros(3) "3.hyps"(1) x have "S (replicate (length x) a @ replicate (n - length x) a @ as)" by auto
         with asm show ?case by (metis replicate_add append_assoc le_add_diff_inverse)
       next
         assume "length x = Suc n \<or> length x \<ge> n + 2"
@@ -250,7 +243,8 @@ next
           hence "x = replicate (Suc n) a @ b # take (length x - n - 2) as" by simp
           with "3.hyps"(2) have almost_there:"S (replicate n a @ take (length x - n - 2) as)" by simp
 
-          from `x @ y = ?front @ as` `length x \<ge> length ?front` have "y = drop (length x - length ?front) as"
+          from `x @ y = ?front @ as` `length x \<ge> length ?front`
+          have "y = drop (length x - length ?front) as"
             by (metis append_eq_conv_conj drop_append drop_eq_Nil self_append_conv2)
           with "3.hyps"(3) have "S (drop (length x - n - 2) as)" by simp
           with almost_there S.intros(3) have "S (replicate n a @ take (length x - n - 2) as @ drop (length x - n - 2) as)" by fastforce
@@ -269,8 +263,8 @@ next
 qed
 
 lemma balanced_S:"S w = balanced 0 w"
-  by (auto simp add: balanced_n_S_n)
+  by (simp add: balanced_n_S_n)
 
 lemma "S [a, a, b, a, b, b]"
-  by (auto simp add: balanced_S)
+  by (simp add: balanced_S)
 end
