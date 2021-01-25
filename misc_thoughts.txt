@@ -1,0 +1,10 @@
+fringe
+-return to prog-extraction by berghofer?
+
+
+do
+-a stable match is: counter example doesnt exist + actually is a match (everyone gets married)
+-is termination automatically checked?
+-run codegen for evaluation purposes?
+-multiple proof methods: 1 sim to coq; 2 sim to standard english-text proof (by contradiction, i think)
+-submit to afp
