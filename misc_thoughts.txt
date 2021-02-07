@@ -1,10 +1,13 @@
-fringe
+fringe/extensions
 -return to prog-extraction by berghofer?
+-lattice of all stable matchings, and how gs always return a particular one in the lattice. see wikipedia 'optimality of the solution'
 
 
 do
--a stable match is: counter example doesnt exist + actually is a match (everyone gets married)
+-a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
 -is termination automatically checked?
+	in terms of termination, basically do exactly what coq paper did.
+	just follow the coq paper "introducing a measure for termination" and see how you might do this in isabelle/hol. it's pretty, gets rid of n^2.
 -run codegen for evaluation purposes?
--multiple proof methods: 1 sim to coq; 2 sim to standard english-text proof (by contradiction, i think)
+-multiple proof methods: 1 sim to coq; 2 sim to standard english-text proof (by contradiction, i think) (see wikipedia; probably need to encode temporality somehow)
 -submit to afp
