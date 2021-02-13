@@ -8,29 +8,29 @@ fun find_idx::"('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> nat o
                                                     Some idx \<Rightarrow> Some (Suc idx)))"
 
 lemma find_idx_bound:"find_idx pred xs = Some idx \<Longrightarrow> idx < length xs"
-proof (induction pred xs arbitrary:idx rule:find_idx.induct)
-  case 1
+proof (induction xs arbitrary:idx)
+  case Nil
   thus ?case by simp
 next
-  case (2 pred x xs)
+  case (Cons x xs)
   have "pred x \<or> \<not> pred x" by simp
   thus ?case
   proof
     assume "pred x"
-    with "2.prems" show ?case by simp
+    with Cons.prems show ?case by simp
   next
     assume "\<not> pred x"
-    moreover with "2.prems" obtain idx' where "find_idx pred xs = Some idx'" by fastforce
-    ultimately show ?case using "2.prems" "2.IH" by fastforce
+    moreover with Cons.prems obtain idx' where "find_idx pred xs = Some idx'" by fastforce
+    ultimately show ?case using Cons by fastforce
   qed
 qed
 
 lemma find_idx_0:"\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx"
-proof (induction pred xs rule:find_idx.induct)
-  case 1
+proof (induction xs)
+  case Nil
   thus ?case by simp
 next
-  case (2 pred x xs)
+  case (Cons x xs)
   have "pred x \<or> \<not> pred x" by simp
   thus ?case
   proof
@@ -38,18 +38,35 @@ next
     thus ?case by simp
   next
     assume "\<not> pred x"
-    moreover with "2.prems" have "\<exists>x\<in>set xs. pred x" by auto
-    ultimately obtain idx where "find_idx pred xs = Some idx" using "2.IH" by auto
+    moreover with Cons.prems have "\<exists>x\<in>set xs. pred x" by auto
+    ultimately obtain idx where "find_idx pred xs = Some idx" using Cons.IH by auto
     thus ?case using `\<not> pred x` by auto
   qed
 qed
 
+lemma "(\<exists>x\<in>set xs. pred x) \<longleftrightarrow> (\<exists>idx. find_idx pred xs = Some idx)"
+proof
+  have "\<forall>x\<in>set xs. \<not> pred x \<Longrightarrow> find_idx pred xs = None"
+  proof (induction xs)
+    case Nil
+    thus ?case by simp
+  next
+    case (Cons x xs)
+    from Cons.prems have "\<forall>x\<in>set xs. \<not> pred x" by auto
+    moreover from Cons.prems have "\<not> pred x" by auto
+    ultimately show ?case using Cons.IH by simp
+  qed
+  thus "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> \<exists>x\<in>set xs. pred x" by fastforce
+next
+  from find_idx_0 show "\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx" .
+qed
+
 lemma find_idx_1:"\<exists>x\<in>set xs. pred x \<Longrightarrow> pred (xs!the(find_idx pred xs))"
-proof (induction pred xs rule: find_idx.induct)
-  case 1
+proof (induction xs)
+  case Nil
   thus ?case by simp
 next
-  case (2 pred x xs)
+  case (Cons x xs)
   have "pred x \<or> \<not> pred x" by simp
   thus ?case
   proof
@@ -57,9 +74,9 @@ next
     thus ?case by simp
   next
     assume "\<not> pred x"
-    moreover with "2.prems" have "\<exists>x\<in>set xs. pred x" by auto
+    moreover with Cons.prems have "\<exists>x\<in>set xs. pred x" by auto
     moreover with find_idx_0 obtain idx where idx:"find_idx pred xs = Some idx" by fastforce
-    ultimately have "pred (xs!idx)" using "2.IH" by simp
+    ultimately have "pred (xs!idx)" using Cons.IH by simp
 
     from idx `\<not> pred x` have "the (find_idx pred (x # xs)) = idx + 1" by auto
     moreover from `pred (xs!idx)` have "pred ((x # xs)!(idx + 1))" by auto

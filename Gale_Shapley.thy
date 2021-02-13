@@ -28,6 +28,25 @@ fun prefers::"person \<Rightarrow> pref_matrix \<Rightarrow> person \<Rightarrow
   )
 ))"
 
+lemma prop_idxs_prog:"m < length xs \<Longrightarrow> sum_list (xs[m:=Suc (xs!m)]) = Suc (sum_list xs)"
+proof (induction xs arbitrary:m)
+  case Nil
+  thus ?case by simp
+next
+  case (Cons x xs)
+  show ?case
+  proof (cases m)
+    case 0
+    thus ?thesis by simp
+  next
+    case (Suc m_1)
+    with Cons.prems have m_1:"m_1 < length xs" by auto
+    with Cons.IH have "sum_list (xs[m_1:=Suc (xs!m_1)]) = Suc (sum_list xs)" by simp
+    moreover from m_1 Cons.prems Suc have "(x # xs)[m:=Suc ((x # xs)!m)] = x # xs[m_1:=Suc (xs!m_1)]" by simp
+    ultimately show ?thesis by fastforce
+  qed
+qed
+
 fun Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
  \<Rightarrow> matching \<Rightarrow> nat list \<Rightarrow>
  matching" where
@@ -39,13 +58,13 @@ fun Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
 (case findFreeMan engagements of None \<Rightarrow> engagements |
 
  Some m \<Rightarrow> (let w = (MPrefs!m)!(prop_idxs!m);
-   next_prop_idxs = list_update prop_idxs m (Suc (prop_idxs!m)) in (
+   next_prop_idxs = prop_idxs[m:=Suc (prop_idxs!m)] in (
    case findFiance engagements w of
      None \<Rightarrow> Gale_Shapley' N MPrefs WPrefs 
-       (list_update engagements m (Some w)) next_prop_idxs
+       (engagements[m:=Some w]) next_prop_idxs
    | Some m' \<Rightarrow> (
      if prefers w WPrefs m m' then Gale_Shapley' N MPrefs WPrefs
-       (list_update (list_update engagements m (Some w)) m' None) next_prop_idxs
+       (engagements[m:=Some w, m':=None]) next_prop_idxs
      else Gale_Shapley' N MPrefs WPrefs
        engagements next_prop_idxs
    )
