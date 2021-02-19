@@ -47,7 +47,7 @@ next
   qed
 qed
 
-fun Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
+function Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
  \<Rightarrow> matching \<Rightarrow> nat list \<Rightarrow>
  matching" where
 "Gale_Shapley' N MPrefs WPrefs 
@@ -71,6 +71,47 @@ fun Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
  ))
 )
 ))"
+  by pat_completeness auto
+termination 
+proof (relation "measure (\<lambda>(N,MPrefs,WPrefs,engagements,prop_idxs). N*N - sum_list prop_idxs)")
+  show "wf (measure (\<lambda>(N,MPrefs,WPrefs,engagements,prop_idxs). N*N - sum_list prop_idxs))" by auto
+next
+  fix N MPrefs WPrefs engagements prop_idxs m w next_prop_idxs
+  assume next_prop_idxs:"next_prop_idxs = prop_idxs[m:=Suc(prop_idxs!m)]"
+  assume "findFreeMan engagements = Some m"
+  hence "m < length engagements" using findFreeMan_bound by auto
+  moreover assume "\<not> length engagements \<noteq> length prop_idxs"
+  ultimately have "m < length prop_idxs" by simp
+  hence "sum_list next_prop_idxs = Suc (sum_list prop_idxs)" using next_prop_idxs prop_idxs_prog by simp
+  moreover assume "\<not> N * N \<le> sum_list prop_idxs"
+  ultimately show "((N, MPrefs, WPrefs, engagements[m:=Some w], next_prop_idxs),
+                     N, MPrefs, WPrefs, engagements, prop_idxs) 
+                     \<in> measure (\<lambda>(N, MPrefs, WPrefs, engagements, prop_idxs). N * N - sum_list prop_idxs)" by auto
+next
+  fix N MPrefs WPrefs engagements prop_idxs m w next_prop_idxs m'
+  assume next_prop_idxs:"next_prop_idxs = prop_idxs[m:=Suc(prop_idxs!m)]"
+  assume "findFreeMan engagements = Some m"
+  hence "m < length engagements" using findFreeMan_bound by auto
+  moreover assume "\<not> length engagements \<noteq> length prop_idxs"
+  ultimately have "m < length prop_idxs" by simp
+  hence "sum_list next_prop_idxs = Suc (sum_list prop_idxs)" using next_prop_idxs prop_idxs_prog by simp
+  moreover assume "\<not> N * N \<le> sum_list prop_idxs"
+  ultimately show "((N, MPrefs, WPrefs, engagements[m:= Some w, m':= None], next_prop_idxs),
+                     N, MPrefs, WPrefs, engagements, prop_idxs)
+                     \<in> measure (\<lambda>(N, MPrefs, WPrefs, engagements, prop_idxs). N * N - sum_list prop_idxs)" by auto
+next
+  fix N MPrefs WPrefs engagements prop_idxs m next_prop_idxs
+  assume next_prop_idxs:"next_prop_idxs = prop_idxs[m:=Suc(prop_idxs!m)]"
+  assume "findFreeMan engagements = Some m"
+  hence "m < length engagements" using findFreeMan_bound by auto
+  moreover assume "\<not> length engagements \<noteq> length prop_idxs"
+  ultimately have "m < length prop_idxs" by simp
+  hence "sum_list next_prop_idxs = Suc (sum_list prop_idxs)" using next_prop_idxs prop_idxs_prog by simp
+  moreover assume "\<not> N * N \<le> sum_list prop_idxs"
+  ultimately show "((N, MPrefs, WPrefs, engagements, next_prop_idxs),
+                     N, MPrefs, WPrefs, engagements, prop_idxs)
+                     \<in> measure (\<lambda>(N, MPrefs, WPrefs, engagements, prop_idxs). N * N - sum_list prop_idxs)" by auto
+qed
 
 fun Gale_Shapley::"pref_matrix \<Rightarrow> pref_matrix \<Rightarrow> matching" where
 "Gale_Shapley MPrefs WPrefs = (let N = length MPrefs in

@@ -44,7 +44,7 @@ next
   qed
 qed
 
-lemma "(\<exists>x\<in>set xs. pred x) \<longleftrightarrow> (\<exists>idx. find_idx pred xs = Some idx)"
+lemma "(\<exists>x\<in>set xs. pred x) = (\<exists>idx. find_idx pred xs = Some idx)"
 proof
   have "\<forall>x\<in>set xs. \<not> pred x \<Longrightarrow> find_idx pred xs = None"
   proof (induction xs)
