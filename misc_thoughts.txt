@@ -1,7 +1,7 @@
 fringe/extensions
 -return to prog-extraction by berghofer?
 -lattice of all stable matchings, and how gs always return a particular one in the lattice. see wikipedia 'optimality of the solution'
-
+-split GS.thy into multiple files???
 
 do
 -isabelle/hol has tail-recursion facilities via partial_function command. Make use of it because my GS is indeed tail-recursive. Make GS tale-recursive, and recognized as such by isabelle/hol
@@ -21,5 +21,4 @@ double-check
 termination thoughts
 1. make gs' a partial function, where only length eng = length prog arguments are within its domain, (prove that length eng = length prog is sufficient to lead to termination of gs')
 2. then refine and prove that sum = N*N actually implies ==> no free, and get rid of the explicit sum > N*N exit.
-3. reference ackermann by paulson and see if there is anything i can learn from there.
-	in particular, try to see if there is tailored-support for tail-recursive functions in isabelle/hol (and ultimately, tailored-support for state invariants on arguments passed around by a tail-recursive function). didnt find anything yet? keep googling, tail recursion, isabelle hol. "partial_function command????"
+3. try to see if there is tailored-support for tail-recursive functions in isabelle/hol (and ultimately, tailored-support for state invariants on arguments passed around by a tail-recursive function). didnt find anything yet? keep googling, tail recursion, isabelle hol. "partial_function command????"

@@ -1,4 +1,4 @@
-theory find_idx
+theory List_Ops
   imports Main
 begin
 fun find_idx::"('a \<Rightarrow> bool) \<Rightarrow> 'a list \<Rightarrow> nat option" where
