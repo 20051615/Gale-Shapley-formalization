@@ -25,26 +25,7 @@ next
   qed
 qed
 
-lemma find_idx_0:"\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx"
-proof (induction xs)
-  case Nil
-  thus ?case by simp
-next
-  case (Cons x xs)
-  have "pred x \<or> \<not> pred x" by simp
-  thus ?case
-  proof
-    assume "pred x"
-    thus ?case by simp
-  next
-    assume "\<not> pred x"
-    moreover with Cons.prems have "\<exists>x\<in>set xs. pred x" by auto
-    ultimately obtain idx where "find_idx pred xs = Some idx" using Cons.IH by auto
-    thus ?case using `\<not> pred x` by auto
-  qed
-qed
-
-lemma "(\<exists>x\<in>set xs. pred x) = (\<exists>idx. find_idx pred xs = Some idx)"
+lemma find_idx_Some:"(\<exists>x\<in>set xs. pred x) \<longleftrightarrow> (\<exists>idx. find_idx pred xs = Some idx)"
 proof
   have "\<forall>x\<in>set xs. \<not> pred x \<Longrightarrow> find_idx pred xs = None"
   proof (induction xs)
@@ -58,10 +39,29 @@ proof
   qed
   thus "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> \<exists>x\<in>set xs. pred x" by fastforce
 next
-  from find_idx_0 show "\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx" .
+  show "\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx"
+  proof (induction xs)
+    case Nil
+    thus ?case by simp
+  next
+    case (Cons x xs)
+    have "pred x \<or> \<not> pred x" by simp
+    thus ?case
+    proof
+      assume "pred x"
+      thus ?case by simp
+    next
+      assume "\<not> pred x"
+      moreover with Cons.prems have "\<exists>x\<in>set xs. pred x" by auto
+      ultimately obtain idx where "find_idx pred xs = Some idx" using Cons.IH by auto
+      thus ?case using `\<not> pred x` by auto
+    qed
+  qed
 qed
 
-lemma find_idx_1:"\<exists>x\<in>set xs. pred x \<Longrightarrow> pred (xs!the(find_idx pred xs))"
+lemma find_idx_None:"find_idx pred xs = None \<longleftrightarrow> (\<forall>x \<in> set xs. \<not>pred x)" using find_idx_Some by (metis option.distinct(1) option.exhaust)
+
+lemma find_idx:"\<exists>x\<in>set xs. pred x \<Longrightarrow> pred (xs!the(find_idx pred xs))"
 proof (induction xs)
   case Nil
   thus ?case by simp
@@ -75,7 +75,7 @@ next
   next
     assume "\<not> pred x"
     moreover with Cons.prems have "\<exists>x\<in>set xs. pred x" by auto
-    moreover with find_idx_0 obtain idx where idx:"find_idx pred xs = Some idx" by fastforce
+    moreover with find_idx_Some obtain idx where idx:"find_idx pred xs = Some idx" by metis
     ultimately have "pred (xs!idx)" using Cons.IH by simp
 
     from idx `\<not> pred x` have "the (find_idx pred (x # xs)) = idx + 1" by auto
@@ -83,5 +83,4 @@ next
     ultimately show ?case by auto
   qed
 qed
-
 end
