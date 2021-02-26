@@ -12,7 +12,7 @@ do
 -run codegen for evaluation purposes?
 -multiple proof methods: 1 sim to coq; 2 sim to standard english-text proof (by contradiction, i think) (see wikipedia; probably need to encode temporality somehow)
 -submit to afp
-
+-consider explicitly reasoning about the sequence of arguments that get formed (a list, starting from the one with measure N * N and ending with noFree -- which could have measure equal to 0 or larger). First form a bunch of lemmas that tie this sequence to the function itself (in particular to GS'-started-with-[None,..][0,...]) via equalities
 
 double-check
 1. that i have, somewhere in my theory, implicitly needed to prove the fact that GS terminates (referring to the wikipedia english-text argument arguing about termination, ie no one is left unmarried). (ie certifying termination for isabelle isnt enough; i need to also conceptually certify termination just as wikipedia does; check that the english-text wikipedia logic is eventually encoded in my completeness (bijection) certification instead, and that it isnt missing)

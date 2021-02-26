@@ -29,7 +29,7 @@ qed
 lemma findFiance:"findFiance engagements w = Some m' \<Longrightarrow> engagements!m' = Some w"
 proof -
   from find_idx_Some find_idx have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> pred (xs ! the (find_idx pred xs))" for pred xs by metis
-  thus "findFiance engagements w = Some m' \<Longrightarrow> engagements!m' = Some w" using findFiance.elims by force
+  thus "findFiance engagements w = Some m' \<Longrightarrow> engagements!m' = Some w" using findFiance.elims by fastforce
 qed
 
 fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
@@ -91,7 +91,7 @@ function Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
 
 (case findFreeMan engagements of None \<Rightarrow> engagements |
 
- Some m \<Rightarrow> (let w = (MPrefs!m)!(prop_idxs!m);
+ Some m \<Rightarrow> (let w = MPrefs!m!(prop_idxs!m);
    next_prop_idxs = prop_idxs[m:=Suc (prop_idxs!m)] in (
    case findFiance engagements w of
      None \<Rightarrow> Gale_Shapley' N MPrefs WPrefs 
@@ -101,10 +101,7 @@ function Gale_Shapley'::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix
        (engagements[m:=Some w, m':=None]) next_prop_idxs
      else Gale_Shapley' N MPrefs WPrefs
        engagements next_prop_idxs
-   )
- ))
-)
-))"
+))))))"
   by pat_completeness auto
 termination 
   apply (relation "measure (\<lambda>(N, _, _, _, prop_idxs). N * N - sum_list prop_idxs)")
@@ -113,6 +110,195 @@ termination
 fun Gale_Shapley::"pref_matrix \<Rightarrow> pref_matrix \<Rightarrow> matching" where
 "Gale_Shapley MPrefs WPrefs = (let N = length MPrefs in
  Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0))"
+
+function GS'_arg_seq::"nat \<Rightarrow> pref_matrix \<Rightarrow> pref_matrix \<Rightarrow> matching \<Rightarrow> nat list \<Rightarrow> (matching \<times> nat list) list" where
+"GS'_arg_seq N MPrefs WPrefs engagements prop_idxs = 
+(if length engagements \<noteq> length prop_idxs then [(engagements, prop_idxs)] else
+(if sum_list prop_idxs \<ge> N * N then [(engagements, prop_idxs)] else
+
+(case findFreeMan engagements of None \<Rightarrow> [(engagements, prop_idxs)] | 
+
+ Some m \<Rightarrow> (let w = MPrefs!m!(prop_idxs!m);
+   next_prop_idxs = prop_idxs[m:=Suc (prop_idxs!m)] in (
+   case findFiance engagements w of
+     None \<Rightarrow> (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+       (engagements[m:=Some w]) next_prop_idxs)
+   | Some m' \<Rightarrow> (
+     if prefers w WPrefs m m' then (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+       (engagements[m:=Some w, m':=None]) next_prop_idxs)
+     else (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+       engagements next_prop_idxs)
+))))))"
+  by pat_completeness auto
+termination
+  apply (relation "measure (\<lambda>(N, _, _, _, prop_idxs). N * N - sum_list prop_idxs)")
+  by (auto intro:termination_aid)
+
+lemma GS'_arg_seq_non_Nil:"GS'_arg_seq N MPrefs WPrefs engagements prop_idxs \<noteq> []"
+proof cases
+  assume 0:"length engagements = length prop_idxs"
+  show ?thesis
+  proof cases
+    assume 1:"sum_list prop_idxs < N * N"
+    show ?thesis
+    proof (cases "findFreeMan engagements")
+      case None
+      thus ?thesis by simp
+    next
+      case (Some m)
+      hence m:"findFreeMan engagements = Some m" .
+      let ?w = "MPrefs!m!(prop_idxs!m)"
+      show ?thesis
+      proof (cases "findFiance engagements ?w")
+        case None
+        thus ?thesis using m by (simp add:Let_def)
+      next
+        case (Some m')
+        thus ?thesis using m by (simp add:Let_def)
+      qed
+    qed
+  next
+    assume "\<not>sum_list prop_idxs < N * N"
+    thus ?thesis by simp
+  qed
+next
+  assume "length engagements \<noteq> length prop_idxs"
+  thus ?thesis by simp
+qed
+
+abbreviation is_terminal where
+"is_terminal N engagements prop_idxs \<equiv> length engagements \<noteq> length prop_idxs \<or> sum_list prop_idxs \<ge> N * N \<or> findFreeMan engagements = None"
+
+lemma GS'_arg_seq_last_is_terminal:"(X, Y) = last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) \<Longrightarrow> is_terminal N X Y"
+proof (induction "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" arbitrary:engagements prop_idxs)
+  case Nil
+  from Nil.hyps GS'_arg_seq_non_Nil have False by metis
+  thus ?case by simp
+next
+  case (Cons hd tl)
+  show ?case
+  proof cases
+    assume "is_terminal N engagements prop_idxs"
+    moreover hence "(X, Y) = (engagements, prop_idxs)" using Cons.prems by auto
+    ultimately show ?case by simp
+  next
+    assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
+    then obtain m where m:"findFreeMan engagements = Some m" by auto
+    let ?w = "MPrefs!m!(prop_idxs!m)"
+    let ?next_prop_idxs = "prop_idxs[m:=Suc (prop_idxs!m)]"
+    let ?GS'_arg_seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+    from non_terminal m have GS_arg_seq:"?GS'_arg_seq = (case findFiance engagements ?w of
+                              None \<Rightarrow> (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                 (engagements[m:=Some ?w]) ?next_prop_idxs)
+                            | Some m' \<Rightarrow> (
+                              if prefers ?w WPrefs m m' then (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                                       (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs)
+                                                       else (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                                        engagements ?next_prop_idxs)))" by (simp add:Let_def)
+    show ?case
+    proof (cases "findFiance engagements ?w")
+      case None
+      hence "tl = GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs" using Cons.hyps(2) GS_arg_seq by simp
+      moreover with Cons.prems Cons.hyps(2) GS'_arg_seq_non_Nil have "(X, Y) = last tl" by (metis last.simps)
+      ultimately show ?thesis using Cons.hyps(1) by metis
+    next
+      case (Some m')
+      show ?thesis
+      proof cases
+        assume "prefers ?w WPrefs m m'"
+        hence "tl = GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs" using Cons.hyps(2) GS_arg_seq Some by simp
+        moreover with Cons.prems Cons.hyps(2) GS'_arg_seq_non_Nil have "(X, Y) = last tl" by (metis last.simps)
+        ultimately show ?thesis using Cons.hyps(1) by metis
+      next
+        assume "\<not> prefers ?w WPrefs m m'"
+        hence "tl = GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs" using Cons.hyps(2) GS_arg_seq Some by simp
+        moreover with Cons.prems Cons.hyps(2) GS'_arg_seq_non_Nil have "(X, Y) = last tl" by (metis last.simps)
+        ultimately show ?thesis using Cons.hyps(1) by metis
+      qed
+    qed
+  qed
+qed
+
+lemma GS'_arg_seq_same_endpoint:"(X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) \<Longrightarrow> (Gale_Shapley' N MPrefs WPrefs engagements prop_idxs) = (Gale_Shapley' N MPrefs WPrefs X Y)"
+proof (induction N MPrefs WPrefs engagements prop_idxs rule:Gale_Shapley'.induct)
+  case (1 N MPrefs WPrefs engagements prop_idxs)
+  show ?case
+  proof cases
+    assume not_init:"(X, Y) \<noteq> (engagements, prop_idxs)"
+    let ?GS' = "Gale_Shapley' N MPrefs WPrefs engagements prop_idxs"
+    let ?GS'_arg_seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+    show ?case
+    proof cases
+      assume 0:"length engagements = length prop_idxs"
+      show ?case
+      proof cases
+        assume 1:"sum_list prop_idxs < N * N"
+        show ?case
+        proof (cases "findFreeMan engagements")
+          case (Some m)
+          hence m:"findFreeMan engagements = Some m" .
+          let ?w = "MPrefs!m!(prop_idxs!m)"
+          let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+          have GS:"?GS' = (case findFiance engagements ?w of
+                               None \<Rightarrow> Gale_Shapley' N MPrefs WPrefs 
+                                      (engagements[m:=Some ?w]) ?next_prop_idxs
+                             | Some m' \<Rightarrow> (
+                               if prefers ?w WPrefs m m' then Gale_Shapley' N MPrefs WPrefs
+                                                             (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs
+                                                        else Gale_Shapley' N MPrefs WPrefs
+                                                              engagements ?next_prop_idxs))" using 0 1 m by (simp add:Let_def)
+          have GS_arg_seq:"?GS'_arg_seq = (case findFiance engagements ?w of
+                              None \<Rightarrow> (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                 (engagements[m:=Some ?w]) ?next_prop_idxs)
+                            | Some m' \<Rightarrow> (
+                              if prefers ?w WPrefs m m' then (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                                       (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs)
+                                                       else (engagements, prop_idxs) # (GS'_arg_seq N MPrefs WPrefs
+                                                                                        engagements ?next_prop_idxs)))" using 0 1 m by (simp add:Let_def)
+          show ?thesis
+          proof (cases "findFiance engagements ?w")
+            case None
+            moreover hence "(X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs)" using not_init "1.prems" GS_arg_seq by auto
+            ultimately show ?thesis using "1.IH"(1) GS 0 1 m by simp
+          next
+            case (Some m')
+            show ?thesis
+            proof cases
+              assume "prefers ?w WPrefs m m'"
+              moreover hence "(X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs)" using not_init "1.prems" GS_arg_seq Some by auto
+              ultimately show ?thesis using "1.IH"(2) GS 0 1 m Some by simp
+            next
+              assume "\<not> prefers ?w WPrefs m m'"
+              moreover hence "(X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs)" using not_init "1.prems" GS_arg_seq Some by auto
+              ultimately show ?thesis using "1.IH"(3) GS 0 1 m Some by simp
+            qed
+          qed
+        next
+          case None
+          thus ?thesis using 0 1 "1.prems" by simp
+        qed
+      next
+        assume "\<not>sum_list prop_idxs < N * N"
+        thus ?case using 0 "1.prems" by simp
+      qed
+    next
+      assume "length engagements \<noteq> length prop_idxs"
+      thus ?case using "1.prems" by simp
+    qed
+  next
+    assume "\<not>(X, Y) \<noteq> (engagements, prop_idxs)"
+    thus ?case by simp
+  qed
+qed
+
+lemma GS'_arg_seq_computes_GS':"Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = fst (last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
+proof -
+  let ?X = "fst(last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
+  let ?Y = "snd(last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
+  from GS'_arg_seq_last_is_terminal have "is_terminal N ?X ?Y" by simp
+  moreover from GS'_arg_seq_non_Nil GS'_arg_seq_same_endpoint have "Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = Gale_Shapley' N MPrefs WPrefs ?X ?Y" by auto
+  ultimately show ?thesis by auto
+qed
 
 lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]"
 proof
@@ -211,87 +397,65 @@ lemma distinct:"is_distinct engagements \<Longrightarrow> is_distinct (Gale_Shap
 proof (induction N MPrefs WPrefs engagements prop_idxs rule:Gale_Shapley'.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
   let ?GS' = "Gale_Shapley' N MPrefs WPrefs engagements prop_idxs"
-  have "length engagements \<noteq> length prop_idxs \<or> length engagements = length prop_idxs" by blast
-  thus ?case
-  proof
-    assume "length engagements \<noteq> length prop_idxs"
-    thus ?case using "1.prems" by simp
-  next
+  show ?case
+  proof cases
     assume 0:"length engagements = length prop_idxs"
-    have "sum_list prop_idxs \<ge> N * N \<or> sum_list prop_idxs < N * N" by auto
-    thus ?case
-    proof
-      assume "sum_list prop_idxs \<ge> N * N"
-      thus ?case using 0 "1.prems" by simp
-    next
+    show ?case
+    proof cases
       assume 1:"sum_list prop_idxs < N * N"
-      have "findFreeMan engagements = None \<or> (\<exists>m. findFreeMan engagements = Some m)" using option.exhaust_sel by auto
-      thus ?case
-      proof
-        assume "findFreeMan engagements = None"
-        thus ?case using 0 1 "1.prems" by simp
-      next
-        assume "\<exists>m. findFreeMan engagements = Some m"
-        then obtain m where m:"findFreeMan engagements = Some m" by blast
-        obtain next_prop_idxs where next_prop_idxs:"next_prop_idxs = prop_idxs[m:=Suc(prop_idxs!m)]" by blast
-        moreover obtain w where w:"w = (MPrefs!m)!(prop_idxs!m)" by blast
-        moreover have "?GS' = (let w = (MPrefs!m)!(prop_idxs!m);
-                                next_prop_idxs = prop_idxs[m:=Suc(prop_idxs!m)] in
-                            (case findFiance engagements w of
+      show ?case
+      proof (cases "findFreeMan engagements")
+        case (Some m)
+        hence m:"findFreeMan engagements = Some m" .
+        let ?w = "MPrefs!m!(prop_idxs!m)"
+        let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+        have GS:"?GS' = (case findFiance engagements ?w of
                              None \<Rightarrow> Gale_Shapley' N MPrefs WPrefs 
-                                    (engagements[m:=Some w]) next_prop_idxs
+                                    (engagements[m:=Some ?w]) ?next_prop_idxs
                            | Some m' \<Rightarrow> (
-                             if prefers w WPrefs m m' then Gale_Shapley' N MPrefs WPrefs
-                                                           (engagements[m:=Some w, m':=None]) next_prop_idxs
-                                                      else Gale_Shapley' N MPrefs WPrefs
-                                                            engagements next_prop_idxs)))" using 0 1 m by simp
-        ultimately have GS_m:"?GS' = (case findFiance engagements w of
-                             None \<Rightarrow> Gale_Shapley' N MPrefs WPrefs 
-                                    (engagements[m:=Some w]) next_prop_idxs
-                           | Some m' \<Rightarrow> (
-                             if prefers w WPrefs m m' then Gale_Shapley' N MPrefs WPrefs
-                                                           (engagements[m:=Some w, m':=None]) next_prop_idxs
-                                                      else Gale_Shapley' N MPrefs WPrefs
-                                                            engagements next_prop_idxs))" by meson
-        have "findFiance engagements w = None \<or> (\<exists>m'. findFiance engagements w = Some m')" using option.exhaust_sel by auto
-        thus ?case
-        proof
-          assume w_single:"findFiance engagements w = None"
-          hence GS:"?GS' = Gale_Shapley' N MPrefs WPrefs (engagements[m:=Some w]) next_prop_idxs" using GS_m by simp
-          from w_single have "\<forall> m < length engagements. engagements!m \<noteq> Some w" using findFiance_None by auto
-          with "1.prems" have "is_distinct (engagements[m:=Some w])" by (metis (full_types) length_list_update nth_list_update nth_list_update_neq)
-          thus ?case using "1.IH"(1) 0 1 m w next_prop_idxs w_single GS by auto
+                             if prefers ?w WPrefs m m' then Gale_Shapley' N MPrefs WPrefs
+                                                           (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs
+                                                       else Gale_Shapley' N MPrefs WPrefs
+                                                            engagements ?next_prop_idxs))" using 0 1 m by (simp add:Let_def)
+        show ?thesis
+        proof (cases "findFiance engagements ?w")
+          case None
+          hence "\<forall> m < length engagements. engagements!m \<noteq> Some ?w" using findFiance_None by simp
+          with "1.prems" have "is_distinct (engagements[m:=Some ?w])" by (metis (full_types) length_list_update nth_list_update nth_list_update_neq)
+          thus ?thesis using "1.IH"(1) 0 1 m None GS by simp
         next
-          assume "\<exists>m'. findFiance engagements w = Some m'"
-          then obtain m' where m':"findFiance engagements w = Some m'" by auto
-          hence GS_m':"?GS' = (if prefers w WPrefs m m'
-                               then Gale_Shapley' N MPrefs WPrefs (engagements[m:=Some w, m':=None]) next_prop_idxs
-                               else Gale_Shapley' N MPrefs WPrefs engagements next_prop_idxs)" using GS_m by simp
-          have "prefers w WPrefs m m' \<or> \<not> prefers w WPrefs m m'" by simp
-          thus ?case
-          proof
-            assume change:"prefers w WPrefs m m'"
-            hence GS:"?GS' = Gale_Shapley' N MPrefs WPrefs (engagements[m:=Some w, m':=None]) next_prop_idxs" using GS_m' by simp
-            from m' findFiance findFiance_bound have "m' < length engagements \<and> engagements!m' = Some w" by simp
-            moreover hence "\<forall>m < length engagements. m \<noteq> m' \<longrightarrow> engagements!m \<noteq> Some w" using "1.prems" by fastforce
-            ultimately have "is_distinct (engagements[m:=Some w, m':=None])" using "1.prems" by (metis length_list_update nth_list_update nth_list_update_neq)
-            thus ?case using "1.IH"(2) 0 1 m w next_prop_idxs m' change GS by auto
+          case (Some m')
+          show ?thesis
+          proof cases
+            from Some findFiance findFiance_bound have "m' < length engagements \<and> engagements!m' = Some ?w" by simp
+            moreover hence "\<forall>m < length engagements. m \<noteq> m' \<longrightarrow> engagements!m \<noteq> Some ?w" using "1.prems" by fastforce
+            ultimately have "is_distinct (engagements[m:=Some ?w, m':=None])" using "1.prems" by (metis length_list_update nth_list_update nth_list_update_neq)
+            moreover assume "prefers ?w WPrefs m m'"
+            ultimately show ?thesis using "1.IH"(2) 0 1 m Some GS by simp
           next
-            assume "\<not> prefers w WPrefs m m'"
-            moreover hence "?GS' = Gale_Shapley' N MPrefs WPrefs engagements next_prop_idxs" using GS_m' by simp
-            ultimately show ?case using "1.IH"(3) 0 1 m w next_prop_idxs m' "1.prems" by auto
+            assume "\<not> prefers ?w WPrefs m m'"
+            thus ?thesis using "1.IH"(3) 0 1 m Some GS "1.prems" by simp
           qed
         qed
+      next
+        case None
+        thus ?thesis using 0 1 "1.prems" by simp
       qed
+    next
+      assume "\<not>sum_list prop_idxs < N * N"
+      thus ?case using 0 "1.prems" by simp
     qed
+  next
+    assume "length engagements \<noteq> length prop_idxs"
+    thus ?case using "1.prems" by simp
   qed
 qed
 
 lemma "is_distinct (Gale_Shapley MPrefs WPrefs)"
 proof -
-  obtain N where "N = length MPrefs" by blast
-  hence "Gale_Shapley MPrefs WPrefs = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" by (meson Gale_Shapley.simps)
-  moreover have "is_distinct (replicate N None)" by simp
+  let ?N = "length MPrefs"
+  have "Gale_Shapley MPrefs WPrefs = Gale_Shapley' ?N MPrefs WPrefs (replicate ?N None) (replicate ?N 0)" by (simp add:Let_def)
+  moreover have "is_distinct (replicate ?N None)" by simp
   ultimately show ?thesis using distinct by metis
 qed
 end
