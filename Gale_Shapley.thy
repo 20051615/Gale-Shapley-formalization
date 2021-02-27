@@ -45,18 +45,24 @@ next
   qed
 qed
 
-lemma in_perm_upt: "(\<exists>A. (A <~~> [0 ..< k] \<and> x \<in> set A)) \<longleftrightarrow> x < k"
+lemma in_perm_upt: "x < k \<longleftrightarrow> (\<forall>A. A <~~> [0 ..< k] \<longrightarrow> x \<in> set A)"
 proof
-  show "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A \<Longrightarrow> x < k"
-  proof -
-    assume "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A"
-    then obtain A where "A <~~> [0..<k]" and "x \<in> set A" by blast
-    hence "x \<in> set [0 ..< k]" using perm_set_eq by blast
-    thus "x < k" using in_upt by metis
+  assume "x < k"
+  show "\<forall>A. A <~~> [0 ..< k] \<longrightarrow> x \<in> set A"
+  proof
+    fix A
+    show "A <~~> [0 ..< k] \<longrightarrow> x \<in> set A"
+    proof
+      assume "A <~~> [0 ..< k]"
+      hence "set A = set [0 ..< k]" by (metis perm_set_eq)
+      with `x < k` in_upt show "x \<in> set A" by metis
+    qed
   qed
 next
-  have "x < k \<Longrightarrow> [0 ..< k] <~~> [0 ..< k] \<and> x \<in> set [0 ..< k]" using in_upt by blast
-  thus "x < k \<Longrightarrow> \<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A" by blast
+  assume "\<forall>A. A <~~> [0 ..< k] \<longrightarrow> x \<in> set A"
+  moreover have "[0 ..< k] <~~> [0 ..< k]" by auto
+  ultimately have "x \<in> set [0 ..< k]" by blast
+  thus "x < k" using in_upt by metis
 qed
 
 fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where
