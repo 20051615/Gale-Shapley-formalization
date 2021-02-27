@@ -7,6 +7,58 @@ type_synonym woman = "person"
 type_synonym pref_matrix = "(person list) list"
 type_synonym matching = "(woman option) list"
 
+lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]"
+proof
+  show "x < k \<Longrightarrow> x \<in> set [0 ..< k]"
+  proof (induction k)
+    case 0
+    thus ?case by simp
+  next
+    case (Suc k_1)
+    hence "x < k_1 \<or> x = k_1" by auto
+    thus ?case
+    proof
+      assume "x < k_1"
+      with Suc.IH have "x \<in> set [0..<k_1]" .
+      thus ?case by auto
+    next
+      assume "x = k_1"
+      thus ?case by auto
+    qed
+  qed
+next
+  show "x \<in> set [0 ..< k] \<Longrightarrow> x < k"
+  proof (induction k)
+    case 0
+    thus ?case by simp
+  next
+    case (Suc k_1)
+    hence "x \<in> set [0..<k_1] \<or> x = k_1" by auto
+    thus ?case
+    proof
+      assume "x \<in> set [0..<k_1]"
+      thus ?case using Suc.IH by simp
+    next
+      assume "x = k_1"
+      thus ?case by simp
+    qed
+  qed
+qed
+
+lemma in_perm_upt: "(\<exists>A. (A <~~> [0 ..< k] \<and> x \<in> set A)) \<longleftrightarrow> x < k"
+proof
+  show "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A \<Longrightarrow> x < k"
+  proof -
+    assume "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A"
+    then obtain A where "A <~~> [0..<k]" and "x \<in> set A" by blast
+    hence "x \<in> set [0 ..< k]" using perm_set_eq by blast
+    thus "x < k" using in_upt by metis
+  qed
+next
+  have "x < k \<Longrightarrow> [0 ..< k] <~~> [0 ..< k] \<and> x \<in> set [0 ..< k]" using in_upt by blast
+  thus "x < k \<Longrightarrow> \<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A" by blast
+qed
+
 fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where
 "is_perm A B = (mset A = mset B)"
 lemma is_perm:"is_perm A B \<Longrightarrow> A <~~> B" by (metis is_perm.simps mset_eq_perm)
@@ -137,11 +189,6 @@ termination
 abbreviation is_terminal where
 "is_terminal N engagements prop_idxs \<equiv> length engagements \<noteq> length prop_idxs \<or> sum_list prop_idxs \<ge> N * N \<or> findFreeMan engagements = None"
 
-abbreviation is_distinct where
-"is_distinct engagements \<equiv> \<forall> m1 < length engagements.
-                           \<forall> m2 < length engagements. 
-                           m1 \<noteq> m2 \<longrightarrow> engagements!m1 = None \<or> engagements!m1 \<noteq> engagements!m2"
-
 lemma GS'_arg_seq_non_Nil:"GS'_arg_seq N MPrefs WPrefs engagements prop_idxs \<noteq> []"
 proof cases
   assume non_terminal:"\<not> is_terminal N engagements prop_idxs"
@@ -241,13 +288,54 @@ proof (induction N MPrefs WPrefs engagements prop_idxs rule:Gale_Shapley'.induct
   qed
 qed
 
-lemma GS'_arg_seq_computes_GS':"Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = fst (last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
+theorem GS'_arg_seq_computes_GS':"Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = fst (last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
 proof -
   let ?X = "fst(last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
   let ?Y = "snd(last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs))"
   from GS'_arg_seq_last_is_terminal have "is_terminal N ?X ?Y" by simp
   moreover from GS'_arg_seq_non_Nil GS'_arg_seq_same_endpoint have "Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = Gale_Shapley' N MPrefs WPrefs ?X ?Y" by auto
   ultimately show ?thesis by auto
+qed
+
+abbreviation is_distinct where
+"is_distinct engagements \<equiv> \<forall> m1 < length engagements.
+                           \<forall> m2 < length engagements. 
+                           m1 \<noteq> m2 \<longrightarrow> engagements!m1 = None \<or> engagements!m1 \<noteq> engagements!m2"
+
+lemma is_matching_intro:
+  assumes noFree:"\<forall> wo \<in> set engagements. wo \<noteq> None"
+    and distinct:"is_distinct engagements"
+    and bounded:"\<forall> wo \<in> set engagements. wo \<noteq> None \<longrightarrow> the wo < length engagements"
+  shows "engagements <~~> map Some [0 ..< length engagements]"
+proof -
+  let ?engagements = "map the engagements"
+  let ?N = "length engagements"
+  from noFree have "\<forall> wo \<in> set engagements. wo = Some (the wo)" using option.exhaust_sel by blast
+  hence engagements:"engagements = map Some ?engagements" by (simp add: nth_equalityI)
+
+  from bounded noFree have bounded_the:"\<forall> w \<in> set ?engagements. w < ?N" by simp
+  from noFree have "\<forall> m < length engagements. engagements!m \<noteq> None" by simp
+  moreover with distinct have "\<forall> m1 < length engagements.
+                               \<forall> m2 < length engagements.
+                               m1 \<noteq> m2 \<longrightarrow> engagements!m1 \<noteq> engagements!m2" by blast
+  ultimately have "\<forall> m1 < length engagements.
+                   \<forall> m2 < length engagements.
+                   m1 \<noteq> m2 \<longrightarrow> the (engagements!m1) \<noteq> the (engagements!m2)" by (meson option.expand)
+  hence "\<forall> m1 < length ?engagements.
+         \<forall> m2 < length ?engagements.
+         m1 \<noteq> m2 \<longrightarrow> ?engagements!m1 \<noteq> ?engagements!m2" by simp
+  hence "distinct ?engagements" by (metis distinct_conv_nth)
+  hence "card (set ?engagements) = length ?engagements" by (metis distinct_card)
+  hence "card (set ?engagements) = ?N" by simp
+  moreover from bounded_the in_upt have "set ?engagements \<subseteq> set [0 ..< ?N]" by blast
+  moreover have "finite (set [0 ..< ?N])" by simp
+  moreover have "card (set [0 ..< ?N]) = ?N" by simp
+  ultimately have "set ?engagements = set [0 ..< ?N]" by (metis card_subset_eq)
+  moreover have "distinct [0 ..< ?N]" by simp
+  ultimately have "mset ?engagements = mset [0 ..< ?N]" using `distinct ?engagements` by (metis set_eq_iff_mset_eq_distinct)
+  moreover have "mset xs = mset ys \<Longrightarrow> mset (map Some xs) = mset (map Some ys)" for xs ys by simp
+  ultimately have "mset (map Some ?engagements) = mset (map Some [0..<?N])" by metis
+  thus ?thesis by (metis engagements mset_eq_perm)
 qed
 
 lemma GS'_arg_seq_all_distinct:"\<lbrakk>is_distinct engagements; (X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs)\<rbrakk> \<Longrightarrow> is_distinct X"
@@ -295,94 +383,6 @@ proof (induction N MPrefs WPrefs engagements prop_idxs rule:GS'_arg_seq.induct)
       qed
     qed
   qed
-qed
-
-lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]"
-proof
-  show "x < k \<Longrightarrow> x \<in> set [0 ..< k]"
-  proof (induction k)
-    case 0
-    thus ?case by simp
-  next
-    case (Suc k_1)
-    hence "x < k_1 \<or> x = k_1" by auto
-    thus ?case
-    proof
-      assume "x < k_1"
-      with Suc.IH have "x \<in> set [0..<k_1]" .
-      thus ?case by auto
-    next
-      assume "x = k_1"
-      thus ?case by auto
-    qed
-  qed
-next
-  show "x \<in> set [0 ..< k] \<Longrightarrow> x < k"
-  proof (induction k)
-    case 0
-    thus ?case by simp
-  next
-    case (Suc k_1)
-    hence "x \<in> set [0..<k_1] \<or> x = k_1" by auto
-    thus ?case
-    proof
-      assume "x \<in> set [0..<k_1]"
-      thus ?case using Suc.IH by simp
-    next
-      assume "x = k_1"
-      thus ?case by simp
-    qed
-  qed
-qed
-
-lemma in_perm_upt: "(\<exists>A. (A <~~> [0 ..< k] \<and> x \<in> set A)) \<longleftrightarrow> x < k"
-proof
-  show "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A \<Longrightarrow> x < k"
-  proof -
-    assume "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A"
-    then obtain A where "A <~~> [0..<k]" and "x \<in> set A" by blast
-    hence "x \<in> set [0 ..< k]" using perm_set_eq by blast
-    thus "x < k" using in_upt by metis
-  qed
-next
-  have "x < k \<Longrightarrow> [0 ..< k] <~~> [0 ..< k] \<and> x \<in> set [0 ..< k]" using in_upt by blast
-  thus "x < k \<Longrightarrow> \<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A" by blast
-qed
-
-lemma is_matching_intro:
-  assumes noFree:"\<forall> wo \<in> set engagements. wo \<noteq> None"
-    and distinct:"is_distinct engagements"
-    and bounded:"\<forall> wo \<in> set engagements. wo \<noteq> None \<longrightarrow> the wo < length engagements"
-  shows "engagements <~~> map Some [0 ..< length engagements]"
-proof -
-  let ?engagements = "map the engagements"
-  let ?N = "length engagements"
-  from noFree have "\<forall> wo \<in> set engagements. wo = Some (the wo)" using option.exhaust_sel by blast
-  hence engagements:"engagements = map Some ?engagements" by (simp add: nth_equalityI)
-
-  from bounded noFree have bounded_the:"\<forall> w \<in> set ?engagements. w < ?N" by simp
-  from noFree have "\<forall> m < length engagements. engagements!m \<noteq> None" by simp
-  moreover with distinct have "\<forall> m1 < length engagements.
-                               \<forall> m2 < length engagements.
-                               m1 \<noteq> m2 \<longrightarrow> engagements!m1 \<noteq> engagements!m2" by blast
-  ultimately have "\<forall> m1 < length engagements.
-                   \<forall> m2 < length engagements.
-                   m1 \<noteq> m2 \<longrightarrow> the (engagements!m1) \<noteq> the (engagements!m2)" by (meson option.expand)
-  hence "\<forall> m1 < length ?engagements.
-         \<forall> m2 < length ?engagements.
-         m1 \<noteq> m2 \<longrightarrow> ?engagements!m1 \<noteq> ?engagements!m2" by simp
-  hence "distinct ?engagements" by (metis distinct_conv_nth)
-  hence "card (set ?engagements) = length ?engagements" by (metis distinct_card)
-  hence "card (set ?engagements) = ?N" by simp
-  moreover from bounded_the in_upt have "set ?engagements \<subseteq> set [0 ..< ?N]" by blast
-  moreover have "finite (set [0 ..< ?N])" by simp
-  moreover have "card (set [0 ..< ?N]) = ?N" by simp
-  ultimately have "set ?engagements = set [0 ..< ?N]" by (metis card_subset_eq)
-  moreover have "distinct [0 ..< ?N]" by simp
-  ultimately have "mset ?engagements = mset [0 ..< ?N]" using `distinct ?engagements` by (metis set_eq_iff_mset_eq_distinct)
-  moreover have "mset xs = mset ys \<Longrightarrow> mset (map Some xs) = mset (map Some ys)" for xs ys by simp
-  ultimately have "mset (map Some ?engagements) = mset (map Some [0..<?N])" by metis
-  thus ?thesis by (metis engagements mset_eq_perm)
 qed
 
 lemma "is_distinct (Gale_Shapley MPrefs WPrefs)"
