@@ -100,13 +100,45 @@ qed
 lemma findPerson:"p \<in> set ps \<Longrightarrow> ps!(the (findPerson ps p)) = p" by (auto intro:find_idx)
 
 fun prefers::"person \<Rightarrow> pref_matrix \<Rightarrow> person \<Rightarrow> person \<Rightarrow> bool" where
-"prefers p PPrefs p1 p2 = (let PPref = PPrefs!p in (
-  case findPerson PPref p1 of None \<Rightarrow> False |
-                            Some idx_1 \<Rightarrow> (
-    case findPerson PPref p2 of None \<Rightarrow> False |
-                              Some idx_2 \<Rightarrow> idx_1 < idx_2
-  )
-))"
+"prefers p PPrefs p1 p2 = (
+  case findPerson (PPrefs!p) p1 of None \<Rightarrow> False |
+                                   Some idx_1 \<Rightarrow> (
+    case findPerson (PPrefs!p) p2 of None \<Rightarrow> False |
+                                     Some idx_2 \<Rightarrow> idx_1 \<le> idx_2))"
+
+lemma prefers_trans:
+  assumes 0:"prefers p PPrefs p1 p2"
+      and 1:"prefers p PPrefs p2 p3"
+    shows "prefers p PPrefs p1 p3"
+proof (cases "findPerson (PPrefs!p) p1")
+  case None
+  hence False using 0 by simp
+  thus ?thesis by simp
+next
+  case (Some idx_1)
+  then obtain idx_1 where idx_1:"findPerson (PPrefs!p) p1 = Some idx_1" by blast
+  show ?thesis
+  proof (cases "findPerson (PPrefs!p) p2")
+    case None
+    hence False using 0 idx_1 by simp
+    thus ?thesis by simp
+  next
+    case (Some idx_2)
+    then obtain idx_2 where idx_2:"findPerson (PPrefs!p) p2 = Some idx_2" by blast
+    hence "idx_1 \<le> idx_2" using 0 idx_1 by simp
+    show ?thesis
+    proof (cases "findPerson (PPrefs!p) p3")
+      case None
+      hence False using 1 idx_2 by simp
+      thus ?thesis by simp
+    next
+      case (Some idx_3)
+      hence "idx_2 \<le> idx_3" using 1 idx_2 by simp
+      with `idx_1 \<le> idx_2` have "idx_1 \<le> idx_3" by simp
+      with idx_1 Some show ?thesis by simp
+    qed
+  qed
+qed
 
 lemma termination_aid:
   assumes 1:"length engagements = length prop_idxs"
@@ -213,6 +245,35 @@ next
   thus ?thesis by auto
 qed
 
+lemma GS'_arg_seq_first_is_start:
+  assumes asm:"(X, Y) # xys = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+  shows "(X, Y) = (engagements, prop_idxs)"
+proof cases
+  assume "is_terminal N engagements prop_idxs"
+  with asm have "(X, Y) # xys = (engagements, prop_idxs) # []" by auto
+  thus ?thesis by simp
+next
+  assume non_terminal:"\<not> is_terminal N engagements prop_idxs"
+  then obtain m where m:"findFreeMan engagements = Some m" by auto
+  let ?w = "MPrefs!m!(prop_idxs!m)"
+  let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+  show ?thesis
+  proof (cases "findFiance engagements ?w")
+    case None
+    thus ?thesis using non_terminal m asm by (simp add:Let_def)
+  next
+    case (Some m')
+    show ?thesis
+    proof cases
+      assume "prefers ?w WPrefs m m'"
+      thus ?thesis using non_terminal m Some asm by (simp add:Let_def)
+    next
+      assume "\<not> prefers ?w WPrefs m m'"
+      thus ?thesis using non_terminal m Some asm by (simp add:Let_def)
+    qed
+  qed
+qed
+
 lemma GS'_arg_seq_last_is_terminal:"(X, Y) = last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) \<Longrightarrow> is_terminal N X Y"
 proof (induction "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" arbitrary:engagements prop_idxs)
   case Nil
@@ -308,10 +369,13 @@ abbreviation is_distinct where
                            \<forall> m2 < length engagements. 
                            m1 \<noteq> m2 \<longrightarrow> engagements!m1 = None \<or> engagements!m1 \<noteq> engagements!m2"
 
+abbreviation is_bounded where
+"is_bounded engagements \<equiv> \<forall> wo \<in> set engagements. wo \<noteq> None \<longrightarrow> the wo < length engagements"
+
 lemma is_matching_intro:
   assumes noFree:"\<forall> wo \<in> set engagements. wo \<noteq> None"
-    and distinct:"is_distinct engagements"
-    and bounded:"\<forall> wo \<in> set engagements. wo \<noteq> None \<longrightarrow> the wo < length engagements"
+    and "is_distinct engagements"
+    and "is_bounded engagements"
   shows "engagements <~~> map Some [0 ..< length engagements]"
 proof -
   let ?engagements = "map the engagements"
@@ -319,11 +383,10 @@ proof -
   from noFree have "\<forall> wo \<in> set engagements. wo = Some (the wo)" using option.exhaust_sel by blast
   hence engagements:"engagements = map Some ?engagements" by (simp add: nth_equalityI)
 
-  from bounded noFree have bounded_the:"\<forall> w \<in> set ?engagements. w < ?N" by simp
+  from `is_bounded engagements` noFree have bounded_the:"\<forall> w \<in> set ?engagements. w < ?N" by simp
   from noFree have "\<forall> m < length engagements. engagements!m \<noteq> None" by simp
-  moreover with distinct have "\<forall> m1 < length engagements.
-                               \<forall> m2 < length engagements.
-                               m1 \<noteq> m2 \<longrightarrow> engagements!m1 \<noteq> engagements!m2" by blast
+  moreover with `is_distinct engagements` have "\<forall> m1 < length engagements. \<forall> m2 < length engagements.
+                                                m1 \<noteq> m2 \<longrightarrow> engagements!m1 \<noteq> engagements!m2" by blast
   ultimately have "\<forall> m1 < length engagements.
                    \<forall> m2 < length engagements.
                    m1 \<noteq> m2 \<longrightarrow> the (engagements!m1) \<noteq> the (engagements!m2)" by (meson option.expand)
@@ -400,4 +463,60 @@ proof -
   moreover have "is_distinct (replicate ?N None)" by simp
   ultimately show ?thesis using GS'_arg_seq_all_distinct by blast
 qed
+
+fun married_better::"woman \<Rightarrow> pref_matrix \<Rightarrow> matching \<Rightarrow> matching \<Rightarrow> bool" where
+"married_better w WPrefs eng_1 eng_2 = (if findFiance eng_1 w = None then 
+                                          True
+                                        else (
+                                          let m_1 = the (findFiance eng_1 w) in (
+                                          if findFiance eng_2 w = None then
+                                            False
+                                          else (
+                                            let m_2 = the (findFiance eng_2 w) in
+                                            prefers w WPrefs m_2 m_1))))"
+
+lemma married_better_trans:
+  assumes 0:"married_better w WPrefs eng_1 eng_2"
+      and 1:"married_better w WPrefs eng_2 eng_3"
+    shows "married_better w WPrefs eng_1 eng_3"
+proof -
+  let ?m_1 = "the (findFiance eng_1 w)"
+  let ?m_2 = "the (findFiance eng_2 w)"
+  let ?m_3 = "the (findFiance eng_3 w)"
+  from 0 have "findFiance eng_1 w = None \<or> (findFiance eng_2 w \<noteq> None \<and> prefers w WPrefs ?m_2 ?m_1)" by (metis married_better.simps)
+  thus ?thesis
+  proof
+    assume "findFiance eng_1 w = None"
+    thus ?thesis by (metis married_better.simps)
+  next
+    assume asm:"findFiance eng_2 w \<noteq> None \<and> prefers w WPrefs ?m_2 ?m_1"
+    moreover with 1 have "prefers w WPrefs ?m_3 ?m_2" by (metis married_better.simps)
+    ultimately have "prefers w WPrefs ?m_3 ?m_1" using prefers_trans by metis
+    moreover from asm 1 have "findFiance eng_3 w \<noteq> None" by (metis married_better.simps)
+    ultimately show ?thesis by (metis married_better.simps)
+  qed
+qed
+
+lemma GS'_arg_seq_all_w_marry_better:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; w < N; i < length seq; j < length seq; i < j\<rbrakk> \<Longrightarrow> married_better w WPrefs (fst(seq!i)) (fst(seq!j))"
+proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i j rule:GS'_arg_seq.induct)
+  case (1 N MPrefs WPrefs engagements prop_idxs)
+  let ?seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+  show ?case
+  proof cases
+    assume "is_terminal N engagements prop_idxs"
+    hence "?seq = [(engagements, prop_idxs)]" by auto
+    hence "length seq = 1" using "1.prems"(1) by simp
+    hence False using "1.prems" by auto
+    thus ?case by simp
+  next
+    assume non_terminal:"\<not> is_terminal N engagements prop_idxs"
+    then obtain m where m:"findFreeMan engagements = Some m" by auto
+    let ?w = "MPrefs!m!(prop_idxs!m)"
+    let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+
+(* first prove that prop_idxs is always well_behaved with all terms < N throughout argument sequence *)
+(* this is probably very non-trivial *)
+(* only then can show bounded, etc. *)
+(* essentially have to show that, when a man has proposed to all, he is necessarily never free again... *)
+(* from this, bounded AND noFree becomes trivial *)
 end
