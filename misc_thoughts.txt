@@ -4,6 +4,7 @@ fringe/extensions
 -split GS.thy into multiple files???
 
 do
+-eventually: remove unused lemmas
 -isabelle/hol has tail-recursion facilities via partial_function command. Make use of it because my GS is indeed tail-recursive. Make GS tale-recursive, and recognized as such by isabelle/hol
 -a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
 -is termination automatically checked?

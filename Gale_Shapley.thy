@@ -274,6 +274,8 @@ next
   qed
 qed
 
+lemma GS'_arg_seq_first_is_start_idx:"(GS'_arg_seq N MPrefs WPrefs engagements prop_idxs)!0 = (engagements, prop_idxs)" using GS'_arg_seq_first_is_start GS'_arg_seq_non_Nil by (metis list.exhaust nth_Cons_0 surj_pair)
+
 lemma GS'_arg_seq_last_is_terminal:"(X, Y) = last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) \<Longrightarrow> is_terminal N X Y"
 proof (induction "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" arbitrary:engagements prop_idxs)
   case Nil
@@ -513,6 +515,28 @@ proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i j rule:GS
     then obtain m where m:"findFreeMan engagements = Some m" by auto
     let ?w = "MPrefs!m!(prop_idxs!m)"
     let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+    show ?case
+    proof (cases "findFiance engagements ?w")
+      case None
+      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
+      from None have seq_tl:"?seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
+      hence length:"length seq = Suc (length ?seq_tl)" using "1.prems"(1) by simp
+      moreover from "1.prems"(5) obtain j_1 where j_1:"j = Suc (j_1)" by (metis Nat.lessE)
+      ultimately have "j_1 < length ?seq_tl" using "1.prems"(4) by simp
+      show ?thesis
+      proof (cases i)
+        case (Suc i_1)
+        with length j_1 "1.prems"(3-5) have "i_1 < length ?seq_tl" and "i_1 < j_1" by auto
+        with "1.IH"(1) "1.prems"(2) `j_1 < length ?seq_tl` non_terminal m None have "married_better w WPrefs (fst(?seq_tl!i_1)) (fst(?seq_tl!j_1))" by metis
+        thus ?thesis using seq_tl Suc j_1 `seq = ?seq` by simp
+      next
+        case 0
+        with seq_tl `seq = ?seq` have "fst(seq!i) = engagements" by simp
+        have "fst(?seq_tl!0) = (engagements [m:=Some ?w])" by (metis GS'_arg_seq_first_is_start_idx fstI)
+        moreover from GS'_arg_seq_non_Nil have "0 < length ?seq_tl" by blast
+        ultimately have "married_better w WPrefs (engagements [m:=Some ?w]) (fst(?seq_tl!j_1))" using "1.IH"(1) non_terminal m None `j_1 < length ?seq_tl` "1.prems"(2)
+
+
 
 (* first prove that prop_idxs is always well_behaved with all terms < N throughout argument sequence *)
 (* this is probably very non-trivial *)
