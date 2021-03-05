@@ -90,8 +90,7 @@ proof -
   thus "findFiance engagements w = None \<Longrightarrow> \<forall>wo\<in>set engagements. wo\<noteq>Some w" by auto
 qed
 lemma findFiance_Some_is_first:
-  assumes 0:"findFiance engagements w = Some m"
-      and 1:"m' < m"
+  assumes 0:"findFiance engagements w = Some m" and 1:"m' < m"
     shows "engagements!m' \<noteq> Some w"
 proof -
   let ?F = "\<lambda>wo. wo = Some w"
@@ -99,8 +98,7 @@ proof -
   with 1 find_idx_Some_is_first show ?thesis by auto
 qed
 lemma findFiance_first_is_Some:
-  assumes 0:"m < length engagements"
-      and 1:"\<forall>m'<m. engagements!m'\<noteq>Some w"
+  assumes 0:"m < length engagements" and 1:"\<forall>m'<m. engagements!m'\<noteq>Some w"
       and 2:"engagements!m = Some w"
     shows "findFiance engagements w = Some m"
 proof -
@@ -133,8 +131,7 @@ case findPerson (PPrefs!p) p1 of None \<Rightarrow> False |
                                    Some idx_2 \<Rightarrow> idx_1 < idx_2))"
 
 lemma prefers_trans:
-  assumes 0:"prefers p PPrefs p1 p2"
-      and 1:"prefers p PPrefs p2 p3"
+  assumes 0:"prefers p PPrefs p1 p2" and 1:"prefers p PPrefs p2 p3"
     shows "prefers p PPrefs p1 p3"
 proof (cases "findPerson (PPrefs!p) p1")
   case None
@@ -543,8 +540,7 @@ fun married_better::"woman \<Rightarrow> pref_matrix \<Rightarrow> matching \<Ri
 lemma married_better_refl: "married_better w WPrefs eng eng" by simp
 
 lemma married_better_trans:
-  assumes 0:"married_better w WPrefs eng_1 eng_2"
-      and 1:"married_better w WPrefs eng_2 eng_3"
+  assumes 0:"married_better w WPrefs eng_1 eng_2" and 1:"married_better w WPrefs eng_2 eng_3"
     shows "married_better w WPrefs eng_1 eng_3"
 proof -
   let ?m_1 = "the (findFiance eng_1 w)"
@@ -757,7 +753,7 @@ proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i j rule:GS
   qed
 qed
 
-lemma "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; 0 < i; k > 0; snd(seq!i)!m = k\<rbrakk> \<Longrightarrow> snd(seq!(i-1))!m = k \<or> (snd(seq!(i-1))!m = k - 1 \<and> findFreeMan (fst(seq!(i-1))) = Some m)"
+lemma GS'_arg_seq_prev_prop_idx_same_or_1_less:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; 0 < i; k > 0; snd(seq!i)!m = k\<rbrakk> \<Longrightarrow> snd(seq!(i-1))!m = k \<or> (snd(seq!(i-1))!m = k - 1 \<and> findFreeMan (fst(seq!(i-1))) = Some m)"
 proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_arg_seq.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
   let ?seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
@@ -836,13 +832,39 @@ proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_
   qed
 qed
 
-lemma "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements (replicate N 0); i < length seq; k > 0; snd(seq!i)!m = k\<rbrakk> \<Longrightarrow> (\<exists>j < i. snd(seq!j)!m = k - 1 \<and> findFreeMan (fst(seq!j)) = Some m)" sorry
+lemma 
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs engagements (replicate N 0)"
+      and "i < length seq" and "0 < i" and "k > 0" and "m < N" and "snd(seq!i)!m = k"
+    shows "\<exists>j < i. snd(seq!j)!m = k - 1 \<and> findFreeMan (fst(seq!j)) = Some m"
+proof (rule ccontr)
+  assume asm:"\<not> (\<exists>j < i. snd(seq!j)!m = k - 1 \<and> findFreeMan (fst(seq!j)) = Some m)"
+  have "j < i \<Longrightarrow> snd(seq!j)!m = k" for j
+  proof (induction "i - j - 1" arbitrary: j)
+    case 0
+    hence "j = i - 1" by simp
+    with `0 < i` have "j < i" by simp
+    from assms `j = i - 1` have "snd(seq!j)!m = k \<or> (snd(seq!(j))!m = k - 1 \<and> findFreeMan (fst(seq!(j))) = Some m)"
+      by (metis GS'_arg_seq_prev_prop_idx_same_or_1_less)
+    with asm `j < i` show ?case by blast
+  next
+    case (Suc d)
+    hence "snd(seq!Suc j)!m = k" by auto
+    moreover from Suc have "Suc j < length seq" using `i < length seq` by simp
+    moreover have "0 < Suc j" by simp
+    ultimately have "snd(seq!(Suc j - 1))!m = k \<or> (snd(seq!(Suc j - 1))!m = k - 1 \<and> findFreeMan (fst(seq!(Suc j - 1))) = Some m)" using GS'_arg_seq_prev_prop_idx_same_or_1_less seq `k > 0` by metis
+    moreover have "Suc j - 1 < i" using Suc by simp
+    ultimately have "snd(seq!(Suc j - 1))!m = k" using asm by blast
+    thus ?case by simp
+  qed
+  hence "snd(seq!0)!m = k" using `0 < i` by simp
+  moreover have "snd(seq!0) = replicate N 0" using seq GS'_arg_seq_first_is_start_idx snd_conv by metis
+  ultimately have "(replicate N 0)!m = k" by simp
+  thus False using `k > 0` `m < N` by simp
+qed
 
 lemma
   assumes "seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
-      and "(engagements, prop_idxs) \<in> set seq"
-      and "m < N"
-      and "prop_idxs!m = N"
+      and "(engagements, prop_idxs) \<in> set seq" and "m < N" and "prop_idxs!m = N"
     shows "engagements!m \<noteq> None"
 sorry
 
