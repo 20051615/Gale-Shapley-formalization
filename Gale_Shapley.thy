@@ -69,8 +69,8 @@ fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where
 "is_perm A B = (mset A = mset B)"
 lemma is_perm:"is_perm A B \<Longrightarrow> A <~~> B" by (metis is_perm.simps mset_eq_perm)
 
-fun is_valid_pref_matrix::"pref_matrix \<Rightarrow> bool" where
-"is_valid_pref_matrix PPrefs = Ball (set PPrefs) (\<lambda>PPref. is_perm PPref [0 ..< length PPrefs])"
+fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" where
+"is_valid_pref_matrix N PPrefs = (if length PPrefs \<noteq> N then False else Ball (set PPrefs) (\<lambda>PPref. is_perm PPref [0 ..< N]))"
 
 fun findFreeMan::"matching \<Rightarrow> man option" where
 "findFreeMan engagements = find_idx (\<lambda>wo. wo = None) engagements"
@@ -84,6 +84,14 @@ qed
 fun findFiance::"matching \<Rightarrow> woman \<Rightarrow> man option" where
 "findFiance engagements w = find_idx (\<lambda>wo. wo = Some w) engagements"
 lemma findFiance_bound:"findFiance engagements w = Some m' \<Longrightarrow> m' < length engagements" by (auto intro:find_idx_bound)
+lemma findFiance_Some:"findFiance engagements w \<noteq> None \<Longrightarrow> Some w \<in> set engagements"
+proof -
+  assume "findFiance engagements w \<noteq> None"
+  hence "\<exists>idx. findFiance engagements w = Some idx" by auto
+  moreover from find_idx_Some have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> \<exists>x \<in> set xs. pred x" for pred xs by metis
+  ultimately have "\<exists>wo \<in> set engagements. wo = Some w" by auto
+  thus ?thesis by simp
+qed
 lemma findFiance_None:"findFiance engagements w = None \<Longrightarrow> \<forall>wo\<in>set engagements. wo \<noteq> Some w"
 proof -
   have "find_idx pred xs = None \<Longrightarrow> \<forall>x\<in>set xs. \<not>pred x" for pred xs using find_idx_None by metis
@@ -421,6 +429,55 @@ proof -
   from GS'_arg_seq_last_is_terminal have "is_terminal N ?X ?Y" by simp
   moreover from GS'_arg_seq_non_Nil GS'_arg_seq_same_endpoint have "Gale_Shapley' N MPrefs WPrefs engagements prop_idxs = Gale_Shapley' N MPrefs WPrefs ?X ?Y" by auto
   ultimately show ?thesis by auto
+qed
+
+lemma GS'_arg_seq_preserves_length:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; (X, Y) \<in> set seq\<rbrakk> \<Longrightarrow> length X = length engagements \<and> length Y = length prop_idxs"
+proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary: seq rule:GS'_arg_seq.induct)
+  case (1 N MPrefs WPrefs engagements prop_idxs)
+  let ?seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+  show ?case
+  proof cases
+    assume "(X, Y) = (engagements, prop_idxs)"
+    thus ?case by simp
+  next
+    assume not_first:"(X, Y) \<noteq> (engagements, prop_idxs)"
+    show ?case
+    proof cases
+      assume "is_terminal N engagements prop_idxs"
+      hence "seq = [(engagements, prop_idxs)]" using `seq = ?seq` by auto
+      hence False using "1.prems"(2) not_first by simp
+      thus ?case by simp
+    next
+      assume non_terminal:"\<not> is_terminal N engagements prop_idxs"
+      then obtain m where m:"findFreeMan engagements = Some m" by auto
+      let ?w = "MPrefs!m!(prop_idxs!m)"
+      let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+      show ?case
+      proof (cases "findFiance engagements ?w")
+        case None
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
+        from None `seq = ?seq` have "seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
+        with not_first "1.prems"(2) have "(X, Y) \<in> set ?seq_tl" by auto
+        with "1.IH"(1) non_terminal m None show ?thesis by simp
+      next
+        case (Some m')
+        show ?thesis
+        proof cases
+          assume change:"prefers ?w WPrefs m m'"
+          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
+          from Some change `seq = ?seq` have "seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
+          with not_first "1.prems"(2) have "(X, Y) \<in> set ?seq_tl" by auto
+          with "1.IH"(2) non_terminal m Some change show ?thesis by simp
+        next
+          assume no_change:"\<not>prefers ?w WPrefs m m'"
+          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+          from Some no_change `seq = ?seq` have "seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
+          with not_first "1.prems"(2) have "(X, Y) \<in> set ?seq_tl" by auto
+          with "1.IH"(3) non_terminal m Some no_change show ?thesis by simp
+        qed
+      qed
+    qed
+  qed
 qed
 
 abbreviation is_distinct where
@@ -862,6 +919,41 @@ proof (rule ccontr)
   thus False using `k > 0` `m < N` by simp
 qed
 
+lemma GS'_arg_seq_all_prev_prop_idxs_exist: "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements (replicate N 0); i < length seq; seq!i = (X, prop_idxs); m < N; prop_idxs!m = k; prop_idx < k\<rbrakk> \<Longrightarrow> \<exists>j < i. snd(seq!j)!m = prop_idx \<and> findFreeMan (fst(seq!j)) = Some m"
+proof (induction "k - prop_idx - 1" arbitrary: prop_idx)
+  case 0
+  hence "prop_idx = k - 1" by simp
+  moreover from "0.prems"(6) have "k > 0" by simp
+  moreover have "0 < i"
+  proof (rule ccontr)
+    assume "\<not> 0 < i"
+    hence "i = 0" by simp
+    with "0.prems"(1-3) have "prop_idxs = replicate N 0" using GS'_arg_seq_first_is_start_idx by (metis prod.inject)
+    with "0.prems"(4-5) `k > 0` show False by simp
+  qed
+  moreover have "snd(seq!i)!m = k" using "0.prems"(3-5) by simp
+  ultimately show ?case using GS'_arg_seq_exists_prev_prop_idx "0.prems"(1-4) by metis
+next
+  case (Suc d)
+  moreover hence "Suc prop_idx < k" by simp
+  moreover from Suc.hyps(2) have "d = k - Suc prop_idx - 1" by simp
+  ultimately have "\<exists>j < i. findFreeMan (fst(seq!j)) = Some m \<and> snd (seq!j)!m = Suc prop_idx" by metis
+  then obtain j where j:"j < i \<and> findFreeMan (fst(seq!j)) = Some m \<and> snd(seq!j)!m = Suc prop_idx" by blast
+  with Suc.prems(2) have "j < length seq" by simp
+  moreover have "0 < j"
+  proof (rule ccontr)
+    assume "\<not>0 < j"
+    hence "j = 0" by simp
+    with j Suc.prems(1) have "snd(seq!j) = replicate N 0" using GS'_arg_seq_first_is_start_idx by (metis snd_conv)
+    with j `m < N` show False by simp
+  qed
+  moreover have "Suc prop_idx > 0" by simp
+  moreover have "prop_idx = Suc prop_idx - 1" by simp
+  ultimately have "\<exists>j'<j. snd(seq!j')!m = prop_idx \<and> findFreeMan (fst(seq!j')) = Some m" using GS'_arg_seq_exists_prev_prop_idx j Suc.prems(1) `m<N` by metis
+  moreover from j have "j < i" by simp
+  ultimately show ?case using Suc_lessD less_trans_Suc by blast
+qed
+
 lemma GS'_arg_seq_married_once_proposed_to: "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq - 1; findFreeMan (fst(seq!i)) = Some m; w = MPrefs!m!(snd(seq!i)!m)\<rbrakk> \<Longrightarrow> findFiance (fst(seq!Suc i)) w \<noteq> None"
 proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_arg_seq.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
@@ -957,11 +1049,122 @@ proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_
   qed
 qed
 
-lemma
-  assumes "seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
-      and "(engagements, prop_idxs) \<in> set seq" and "m < N" and "prop_idxs!m = N"
-    shows "engagements!m \<noteq> None"
-sorry
+lemma GS'_arg_seq_any_man_done_proposing_means_done:
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+      and "is_valid_pref_matrix N MPrefs" and "(engagements, prop_idxs) \<in> set seq" and "m < N" and "prop_idxs!m = N"
+    shows "None \<notin> set engagements"
+proof -
+  from assms(3) obtain i where i:"seq!i = (engagements, prop_idxs) \<and> i < length seq" by (metis in_set_conv_nth)
+  with GS'_arg_seq_all_prev_prop_idxs_exist assms(4-5) seq have each_increment:"prop_idx < N \<Longrightarrow> \<exists>j < i. findFreeMan (fst(seq!j)) = Some m \<and> snd(seq!j)!m = prop_idx" for prop_idx by metis
+  have each_womans_marriage:"prop_idx < N \<Longrightarrow> \<exists>j \<le> i. findFiance (fst(seq!j)) (MPrefs!m!prop_idx) \<noteq> None" for prop_idx
+  proof -
+    assume "prop_idx < N"
+    with each_increment obtain j_1 where j_1:"j_1 < i \<and> findFreeMan(fst(seq!j_1)) = Some m \<and> snd(seq!j_1)!m = prop_idx" by blast
+    moreover with i have "j_1 < length seq - 1" by auto
+    ultimately have "findFiance (fst(seq!Suc j_1)) (MPrefs!m!prop_idx) \<noteq> None" using GS'_arg_seq_married_once_proposed_to seq by blast
+    moreover from j_1 have "Suc j_1 \<le> i" by simp 
+    ultimately show ?thesis by blast
+  qed
+  have w_all_still_married:"prop_idx < N \<Longrightarrow> findFiance engagements (MPrefs!m!prop_idx) \<noteq> None" for prop_idx
+  proof -
+    assume "prop_idx < N"
+    with each_womans_marriage obtain j where j:"j \<le> i \<and> findFiance (fst(seq!j)) (MPrefs!m!prop_idx) \<noteq> None" by blast
+    hence "j = i \<or> j < i" by auto
+    thus ?thesis
+    proof
+      assume "j = i"
+      thus ?thesis using j i by simp
+    next
+      assume "j < i"
+      moreover with i have "j < length seq" by simp
+      moreover have "is_distinct (replicate N None)" by simp
+      ultimately have "married_better (MPrefs!m!prop_idx) WPrefs (fst(seq!j)) (fst(seq!i))" using GS'_arg_seq_all_w_marry_better seq i by metis
+      hence "married_better (MPrefs!m!prop_idx) WPrefs (fst(seq!j)) engagements" using i by simp
+      thus ?thesis using j by (metis married_better.simps)
+    qed
+  qed
+  from assms(2) have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
+  with `m < N` have "m < length MPrefs" by simp
+  with assms(2) have perm:"(MPrefs!m) <~~> [0 ..< N]" by (metis is_valid_pref_matrix.simps nth_mem is_perm)
+  moreover have "length [0 ..< N] = N" by simp
+  ultimately have "length (MPrefs!m) = N" by (metis perm_length)
+  hence "\<forall>w \<in> set (MPrefs!m). findFiance engagements w \<noteq> None" using w_all_still_married by (metis in_set_conv_nth)
+  with perm have "\<forall>w \<in> set [0 ..< N]. findFiance engagements w \<noteq> None" by (metis mset_eq_setD mset_eq_perm)
+  with findFiance_Some have "\<forall>w \<in> set [0 ..< N]. Some w \<in> set engagements" by simp
+  hence "\<forall>wo \<in> set (map Some [0 ..< N]). wo \<in> set engagements" by simp
+  hence subset:"set (map Some [0 ..< N]) \<subseteq> set engagements" by blast
+  moreover have card_front:"card (set (map Some [0 ..< N])) = N"
+    apply (induction N)
+     apply (auto)
+    by (metis atLeast0_lessThan_Suc atLeastLessThan_empty_iff card_Suc_eq image_is_empty insert_absorb lessThan_atLeast0 lessThan_eq_iff not_gr_zero these_image_Some_eq these_insert_Some)
+  moreover have finite:"finite (set engagements)" by simp
+  ultimately have "card (set engagements) \<ge> N" by (metis card_mono)
+  moreover have "length engagements = N" using GS'_arg_seq_preserves_length seq assms(3) by (metis length_replicate)
+  moreover hence "card (set engagements) \<le> N" using card_length by auto
+  ultimately have card_back:"card (set engagements) = N" by simp
+  from subset card_front card_back finite have "set (map Some [0 ..< N]) = set engagements" by (metis card_subset_eq)
+  moreover have "None \<notin> set (map Some [0 ..< N])" by simp
+  ultimately show ?thesis by simp
+qed
+
+lemma GS'_arg_seq_never_reaches_NxN:
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+      and "is_valid_pref_matrix N MPrefs" and "N \<noteq> 0"
+      and "(engagements, prop_idxs) \<in> set seq"
+    shows "sum_list prop_idxs < N * N"
+proof (rule ccontr)
+  assume asm:"\<not> sum_list prop_idxs < N * N"
+  have l_prop_idxs:"length prop_idxs = N" using GS'_arg_seq_preserves_length seq assms(4) by (metis length_replicate)
+  have "\<exists>m < N. prop_idxs!m \<ge> N"
+  proof (rule ccontr)
+    have "\<lbrakk>prop_idxs \<noteq> []; \<forall>m < length prop_idxs. prop_idxs!m < N\<rbrakk> \<Longrightarrow> sum_list prop_idxs < length prop_idxs * N"
+    proof (induction prop_idxs)
+      case Nil
+      thus ?case by simp
+    next
+      case (Cons x xs)
+      hence "x < N" by auto
+      let ?prop_idxs = "x # xs"
+      show ?case
+      proof (cases xs)
+        case Nil
+        hence "?prop_idxs = [x]" by simp
+        moreover have "sum_list ?prop_idxs = x" using Nil by simp
+        ultimately show ?thesis using Nil `x<N` by simp
+      next
+        fix y ys
+        assume "xs = Cons y ys"
+        hence "xs \<noteq> []" by simp
+        from Cons.prems(2) have "\<forall>m < length (x # xs) - 1. (x # xs) ! Suc m < N" by (metis diff_Suc_eq_diff_pred zero_less_diff)
+        hence "\<forall>m < length xs. xs!m < N" by simp
+        with Cons.IH `xs \<noteq> []` have "sum_list xs < length xs * N" by simp
+        moreover have "sum_list ?prop_idxs = x + sum_list xs" by simp
+        moreover have "length ?prop_idxs * N = length xs * N + N" by simp
+        ultimately show ?thesis using `x<N` by simp
+      qed
+    qed
+    moreover assume "\<not>(\<exists>m < N. prop_idxs!m \<ge> N)"
+    moreover hence "\<forall>m < length prop_idxs. prop_idxs!m < N" using l_prop_idxs by auto
+    moreover from l_prop_idxs `N\<noteq>0` have "prop_idxs \<noteq> []" by auto
+    ultimately show False using asm l_prop_idxs by simp
+  qed
+  then obtain m k where m_k:"m < N \<and> prop_idxs!m = k \<and> k \<ge> N" by blast
+  hence "k > N \<or> k = N" by auto
+  hence False
+  proof
+    assume "k > N"
+    moreover from assms(4) obtain i where i:"i < length seq \<and> seq!i = (engagements, prop_idxs)" by (metis in_set_conv_nth)
+    ultimately have "\<exists>j < i. snd(seq!j)!m = N \<and> findFreeMan (fst(seq!j)) = Some m" using GS'_arg_seq_all_prev_prop_idxs_exist seq m_k by metis
+    then obtain j where j:"j < i \<and> snd(seq!j)!m = N \<and> findFreeMan (fst(seq!j)) = Some m" by blast
+    with i have "j < length seq" by simp
+    hence "(fst(seq!j), snd(seq!j)) \<in> set seq" by simp
+    with GS'_arg_seq_any_man_done_proposing_means_done seq assms(2) m_k j have "None \<notin> set (fst(seq!j))" by metis
+    moreover from findFreeMan findFreeMan_bound j have "None \<in> set (fst(seq!j))" by (metis in_set_conv_nth)
+    ultimately show False by simp
+  next
+    assume "k = N"
+
+
 
 
 (* first prove that prop_idxs is always well_behaved with all terms < N throughout argument sequence *)
