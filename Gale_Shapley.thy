@@ -75,6 +75,18 @@ fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" whe
 fun findFreeMan::"matching \<Rightarrow> man option" where
 "findFreeMan engagements = find_idx (\<lambda>wo. wo = None) engagements"
 lemma findFreeMan_bound:"findFreeMan engagements = Some m \<Longrightarrow> m < length engagements" by (auto intro:find_idx_bound)
+lemma findFreeMan_None:"findFreeMan engagements = None \<longleftrightarrow> (\<forall>wo\<in>set engagements. wo \<noteq> None)"
+proof
+  let ?F = "\<lambda>wo. wo = None"
+  from find_idx_None have "find_idx pred xs = None \<Longrightarrow> (\<forall>x\<in>set xs. \<not>pred x)" for pred xs by metis
+  hence "find_idx ?F engagements = None \<Longrightarrow> (\<forall>x \<in>set engagements. \<not>?F x)" by blast
+  thus "findFreeMan engagements = None \<Longrightarrow> (\<forall>wo\<in>set engagements. wo \<noteq> None)" by (metis findFreeMan.simps)
+next
+  let ?F = "\<lambda>wo. wo = None"
+  from find_idx_None have 0:"(\<forall>x\<in>set xs. \<not>pred x) \<Longrightarrow> find_idx pred xs = None" for pred xs by metis
+  have "(\<forall>x\<in>set engagements. \<not>?F x) \<Longrightarrow> find_idx ?F engagements = None" by (simp add:0)
+  thus "(\<forall>wo\<in>set engagements. wo \<noteq> None) \<Longrightarrow> findFreeMan engagements = None" by simp
+qed
 lemma findFreeMan:"findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None"
 proof -
   from find_idx_Some find_idx have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> pred (xs ! the (find_idx pred xs))" for pred xs by metis
@@ -377,6 +389,60 @@ next
         hence "tl = GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs" using Cons.hyps(2) non_terminal m Some by (simp add:Let_def)
         moreover with Cons.prems Cons.hyps(2) GS'_arg_seq_non_Nil have "(X, Y) = last tl" by (metis last.simps)
         ultimately show ?thesis using Cons.hyps(1) by metis
+      qed
+    qed
+  qed
+qed
+
+lemma GS'_arg_seq_terminal_is_last:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; seq!i = (X, Y); is_terminal N X Y\<rbrakk> \<Longrightarrow> length seq = Suc i"
+proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary: seq i rule:GS'_arg_seq.induct)
+  case (1 N MPrefs WPrefs engagements prop_idxs)
+  show ?case
+  proof (cases i)
+    case 0
+    with "1.prems"(1-3) GS'_arg_seq_first_is_start_idx have "(X, Y) = (engagements, prop_idxs)" by metis
+    with "1.prems"(4) have "is_terminal N engagements prop_idxs" by simp
+    hence "seq = [(engagements, prop_idxs)]" using "1.prems"(1) by auto
+    with "1.prems"(2) show ?thesis by simp
+  next
+    case (Suc i_1)
+    have non_terminal:"\<not> is_terminal N engagements prop_idxs"
+    proof
+      assume "is_terminal N engagements prop_idxs"
+      hence "seq = [(engagements, prop_idxs)]" using "1.prems"(1) by auto
+      with "1.prems"(2) Suc show False by simp
+    qed
+    then obtain m where m:"findFreeMan engagements = Some m" by auto
+    let ?w = "MPrefs!m!(prop_idxs!m)"
+    let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
+    show ?thesis
+    proof (cases "findFiance engagements ?w")
+      case None
+      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
+      from "1.prems"(1) non_terminal m None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      moreover with "1.prems"(2) Suc have "i_1 < length ?seq_tl" by simp
+      moreover with "1.prems"(3) Suc seq_tl have "?seq_tl!i_1 = (X, Y)" by simp
+      ultimately have "length ?seq_tl = Suc i_1" using "1.prems"(4) "1.IH"(1) using non_terminal m None by metis
+      thus ?thesis using seq_tl Suc by simp
+    next
+      case (Some m')
+      show ?thesis
+      proof cases
+        assume change:"prefers ?w WPrefs m m'"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+        moreover with "1.prems"(2) Suc have "i_1 < length ?seq_tl" by simp
+        moreover with "1.prems"(3) Suc seq_tl have "?seq_tl!i_1 = (X, Y)" by simp
+        ultimately have "length ?seq_tl = Suc i_1" using "1.prems"(4) "1.IH"(2) using non_terminal m Some change by metis
+        thus ?thesis using seq_tl Suc by simp
+      next
+        assume no_change:"\<not> prefers ?w WPrefs m m'"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+        moreover with "1.prems"(2) Suc have "i_1 < length ?seq_tl" by simp
+        moreover with "1.prems"(3) Suc seq_tl have "?seq_tl!i_1 = (X, Y)" by simp
+        ultimately have "length ?seq_tl = Suc i_1" using "1.prems"(4) "1.IH"(3) using non_terminal m Some no_change by metis
+        thus ?thesis using seq_tl Suc by simp
       qed
     qed
   qed
@@ -1109,62 +1175,115 @@ qed
 
 lemma GS'_arg_seq_never_reaches_NxN:
   assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
-      and "is_valid_pref_matrix N MPrefs" and "N \<noteq> 0"
+      and "is_valid_pref_matrix N MPrefs" and "N \<ge> 2"
       and "(engagements, prop_idxs) \<in> set seq"
     shows "sum_list prop_idxs < N * N"
 proof (rule ccontr)
   assume asm:"\<not> sum_list prop_idxs < N * N"
+  from assms(4) obtain i where i:"i < length seq \<and> seq!i = (engagements, prop_idxs)" by (metis in_set_conv_nth)
   have l_prop_idxs:"length prop_idxs = N" using GS'_arg_seq_preserves_length seq assms(4) by (metis length_replicate)
+  have sum_bound:"\<forall>m < length prop_idxs. prop_idxs!m \<le> N \<Longrightarrow> sum_list prop_idxs \<le> length prop_idxs * N" for prop_idxs N
+  proof (induction prop_idxs)
+    case Nil
+    thus ?case by simp
+  next
+    case (Cons x xs)
+    hence "x \<le> N" by auto
+    let ?prop_idxs = "x # xs"
+    from Cons.prems have "\<forall>m < length (x # xs) - 1. (x # xs) ! Suc m \<le> N" by (metis diff_Suc_eq_diff_pred zero_less_diff)
+    hence "\<forall>m < length xs. xs!m \<le> N" by simp
+    with Cons.IH have "sum_list xs \<le> length xs * N" by simp
+    moreover have "sum_list ?prop_idxs = x + sum_list xs" by simp
+    moreover have "length ?prop_idxs * N = length xs * N + N" by simp
+    ultimately show ?case using `x\<le>N` by simp
+  qed
   have "\<exists>m < N. prop_idxs!m \<ge> N"
   proof (rule ccontr)
-    have "\<lbrakk>prop_idxs \<noteq> []; \<forall>m < length prop_idxs. prop_idxs!m < N\<rbrakk> \<Longrightarrow> sum_list prop_idxs < length prop_idxs * N"
-    proof (induction prop_idxs)
-      case Nil
-      thus ?case by simp
-    next
-      case (Cons x xs)
-      hence "x < N" by auto
-      let ?prop_idxs = "x # xs"
-      show ?case
-      proof (cases xs)
-        case Nil
-        hence "?prop_idxs = [x]" by simp
-        moreover have "sum_list ?prop_idxs = x" using Nil by simp
-        ultimately show ?thesis using Nil `x<N` by simp
-      next
-        fix y ys
-        assume "xs = Cons y ys"
-        hence "xs \<noteq> []" by simp
-        from Cons.prems(2) have "\<forall>m < length (x # xs) - 1. (x # xs) ! Suc m < N" by (metis diff_Suc_eq_diff_pred zero_less_diff)
-        hence "\<forall>m < length xs. xs!m < N" by simp
-        with Cons.IH `xs \<noteq> []` have "sum_list xs < length xs * N" by simp
-        moreover have "sum_list ?prop_idxs = x + sum_list xs" by simp
-        moreover have "length ?prop_idxs * N = length xs * N + N" by simp
-        ultimately show ?thesis using `x<N` by simp
-      qed
-    qed
-    moreover assume "\<not>(\<exists>m < N. prop_idxs!m \<ge> N)"
-    moreover hence "\<forall>m < length prop_idxs. prop_idxs!m < N" using l_prop_idxs by auto
-    moreover from l_prop_idxs `N\<noteq>0` have "prop_idxs \<noteq> []" by auto
-    ultimately show False using asm l_prop_idxs by simp
+    assume "\<not>(\<exists>m < N. prop_idxs!m \<ge> N)"
+    hence "\<forall>m < length prop_idxs. prop_idxs!m \<le> N - 1" using l_prop_idxs by auto
+    with sum_bound l_prop_idxs have "sum_list prop_idxs \<le> N * (N - 1)" by metis
+    hence "sum_list prop_idxs \<le> N * N - N" by (simp add: diff_mult_distrib2)
+    thus False using asm `N\<ge>2` using le_add_diff_inverse2 by fastforce
   qed
   then obtain m k where m_k:"m < N \<and> prop_idxs!m = k \<and> k \<ge> N" by blast
-  hence "k > N \<or> k = N" by auto
-  hence False
-  proof
-    assume "k > N"
-    moreover from assms(4) obtain i where i:"i < length seq \<and> seq!i = (engagements, prop_idxs)" by (metis in_set_conv_nth)
-    ultimately have "\<exists>j < i. snd(seq!j)!m = N \<and> findFreeMan (fst(seq!j)) = Some m" using GS'_arg_seq_all_prev_prop_idxs_exist seq m_k by metis
+  have less_eq_N:"\<lbrakk>m < N; prop_idxs!m = k; k > N\<rbrakk> \<Longrightarrow> False" for m k
+  proof -
+    assume "k > N" and 0:"m < N" and 1:"prop_idxs!m = k"
+    hence "\<exists>j < i. snd(seq!j)!m = N \<and> findFreeMan (fst(seq!j)) = Some m" using GS'_arg_seq_all_prev_prop_idxs_exist seq i by metis
     then obtain j where j:"j < i \<and> snd(seq!j)!m = N \<and> findFreeMan (fst(seq!j)) = Some m" by blast
     with i have "j < length seq" by simp
     hence "(fst(seq!j), snd(seq!j)) \<in> set seq" by simp
-    with GS'_arg_seq_any_man_done_proposing_means_done seq assms(2) m_k j have "None \<notin> set (fst(seq!j))" by metis
+    with GS'_arg_seq_any_man_done_proposing_means_done seq assms(2) 0 1 j have "None \<notin> set (fst(seq!j))" by metis
     moreover from findFreeMan findFreeMan_bound j have "None \<in> set (fst(seq!j))" by (metis in_set_conv_nth)
     ultimately show False by simp
+  qed
+  from m_k have "k > N \<or> k = N" by auto
+  thus False
+  proof
+    assume "k > N"
+    with m_k less_eq_N show False by metis
   next
     assume "k = N"
+    hence "None \<notin> set engagements" using m_k GS'_arg_seq_any_man_done_proposing_means_done assms(1-4) by metis
+    hence "findFreeMan engagements = None" by (metis findFreeMan_None)
+    hence "is_terminal N engagements prop_idxs" by simp
+    hence "length seq = Suc i" using GS'_arg_seq_terminal_is_last seq i by metis 
 
+    have "0 < i"
+    proof (rule ccontr)
+      assume "\<not> 0 < i"
+      hence "i = 0" by simp
+      with i GS'_arg_seq_first_is_start_idx have "(engagements, prop_idxs) = (replicate N None, replicate N 0)" using seq by metis
+      with m_k have "(replicate N 0)!m = k" by simp
+      with `k = N` `N \<ge> 2` m_k show False by simp
+    qed
 
+    have if_N_then_prev_is_bump:"\<lbrakk>m' < N; prop_idxs!m' = N\<rbrakk> \<Longrightarrow> findFreeMan (fst(seq!(i-1))) = Some m'" for m'
+    proof -
+      assume "prop_idxs!m' = N" and "m' < N"
+      hence "snd(seq!i)!m' = N" using i by simp
+      moreover have "0 < N" using `N \<ge> 2` by simp
+      ultimately have "snd(seq!(i-1))!m' = N \<or> snd(seq!(i-1))!m' = N-1 \<and> findFreeMan (fst(seq!(i-1))) = Some m'" using GS'_arg_seq_prev_prop_idx_same_or_1_less i `0 < i` seq by metis
+      moreover have "m'<N \<Longrightarrow> \<not>snd(seq!(i-1))!m' = N" for m'
+      proof
+        assume asm:"snd(seq!(i-1))!m' = N"
+        moreover have "i-1 < length seq" using i by auto
+        ultimately have "(fst(seq!(i-1)), snd(seq!(i-1)))\<in> set seq" by simp
+        moreover assume "m' < N"
+        ultimately have "None \<notin> set (fst(seq!(i-1)))" using GS'_arg_seq_any_man_done_proposing_means_done asm assms(1-2) by metis
+        hence "findFreeMan (fst(seq!(i-1))) = None" by (metis findFreeMan_None)
+        hence "is_terminal N (fst(seq!(i-1))) (snd(seq!(i-1)))" by simp
+        moreover have "seq!(i-1) = (fst(seq!(i-1)), snd(seq!(i-1)))" by simp
+        ultimately have "length seq = Suc (i-1)" using `i-1<length seq` GS'_arg_seq_terminal_is_last seq by metis
+        with `0<i` `length seq = Suc i` show False by simp
+      qed
+      ultimately show ?thesis using `m'<N` by blast
+    qed
+
+    have "\<lbrakk>m' < N; m' \<noteq> m\<rbrakk> \<Longrightarrow> prop_idxs!m' \<noteq> N" for m'
+    proof
+      assume "m' < N" and "prop_idxs!m' = N"
+      hence "findFreeMan (fst(seq!(i-1))) = Some m'" using if_N_then_prev_is_bump by simp
+      moreover from m_k `k=N` have "findFreeMan (fst(seq!(i-1))) = Some m" using if_N_then_prev_is_bump by simp
+      moreover assume "m'\<noteq>m"
+      ultimately show False by simp
+    qed
+    moreover from less_eq_N have "m' < N \<Longrightarrow> prop_idxs!m' \<le> N" for m' by fastforce
+    ultimately have "\<lbrakk>m' < N; m' \<noteq> m\<rbrakk> \<Longrightarrow> prop_idxs!m' < N" for m' by fastforce
+    hence "\<forall>m'<N. m'\<noteq>m \<longrightarrow> prop_idxs!m' < N" by blast
+    moreover from m_k `k = N` l_prop_idxs have m:"prop_idxs!m = N \<and> m < length prop_idxs" by auto
+    moreover from `N\<ge>2` have "N - 1 < N" by simp
+    ultimately have "\<forall>m'<N. (prop_idxs[m:=N-1])!m' < N" by (metis nth_list_update)
+    moreover have "x < N \<Longrightarrow> x \<le> N-1" for x by fastforce
+    ultimately have "\<forall>m'<N. (prop_idxs[m:=N-1])!m' \<le> N - 1" by blast
+    moreover from l_prop_idxs have "length (prop_idxs[m:=N-1]) = N" by simp
+    ultimately have "sum_list (prop_idxs[m:=N-1]) \<le> N * (N - 1)" using sum_bound by metis
+    hence "sum_list (prop_idxs[m:=N-1]) \<le> N * N - N" by (simp add: diff_mult_distrib2)
+    moreover from m have "sum_list (prop_idxs[m:=N-1]) = sum_list prop_idxs - 1" using `N\<ge>2` by (simp add: sum_list_update)
+    ultimately have "sum_list prop_idxs \<le> N * N - N + 1" by (metis le_diff_conv)
+    with asm `N\<ge>2` show False by (metis add_leD2 le_add_diff_inverse2 le_neq_implies_less le_square nat_1_add_1 nat_add_left_cancel_le numeral_le_one_iff semiring_norm(69))
+  qed
+qed
 
 
 (* first prove that prop_idxs is always well_behaved with all terms < N throughout argument sequence *)
