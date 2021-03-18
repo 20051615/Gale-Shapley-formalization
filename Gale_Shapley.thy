@@ -11,9 +11,11 @@ lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]" by simp
 lemma in_perm_upt: "x < k \<longleftrightarrow> (\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A)" using in_upt perm_refl perm_set_eq by metis
 
 fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where "is_perm A B = (mset A = mset B)"
-lemma is_perm:"is_perm A B \<longleftrightarrow> A <~~> B" using is_perm.simps mset_eq_perm by metis
+lemma is_perm:"is_perm A B \<longleftrightarrow> A <~~> B" using mset_eq_perm by auto
 fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" where
-"is_valid_pref_matrix N PPrefs = (if length PPrefs \<noteq> N then False else Ball (set PPrefs) (\<lambda>PPref. is_perm PPref [0 ..< N]))"
+"is_valid_pref_matrix N PPrefs = (if length PPrefs \<noteq> N then False else Ball (set PPrefs) (is_perm [0 ..< N]))"
+lemma length_PPrefs:"is_valid_pref_matrix N PPrefs \<Longrightarrow> length PPrefs = N" using is_valid_pref_matrix.simps by metis
+lemma perm_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; m < N\<rbrakk> \<Longrightarrow> PPrefs!m <~~> [0 ..< N]"  using is_valid_pref_matrix.simps nth_mem is_perm perm_sym by metis
 
 fun findFreeMan::"matching \<Rightarrow> man option" where
 "findFreeMan engagements = find_idx None engagements"
@@ -700,41 +702,63 @@ proof -
 qed
 
 fun married_better::"woman \<Rightarrow> pref_matrix \<Rightarrow> matching \<Rightarrow> matching \<Rightarrow> bool" where
-"married_better w WPrefs eng_1 eng_2 = (if findFiance eng_1 w = None then 
-                                          True
-                                        else (
-                                          let m_1 = the (findFiance eng_1 w) in (
-                                          if findFiance eng_2 w = None then
-                                            False
-                                          else (
-                                            let m_2 = the (findFiance eng_2 w) in (
-                                            if m_1 = m_2 then
-                                              True
-                                            else
-                                              prefers w WPrefs m_2 m_1)))))"
+"married_better w WPrefs eng_1 eng_2 = (case findFiance eng_1 w of None \<Rightarrow> True | Some m_1 \<Rightarrow> (
+                                          case findFiance eng_2 w of None \<Rightarrow> False | Some m_2 \<Rightarrow> (
+                                            if m_1 = m_2 then True
+                                                         else prefers w WPrefs m_2 m_1)))"
 
-lemma married_better_refl: "married_better w WPrefs eng eng" by simp
+lemma married_better_refl: "married_better w WPrefs eng eng"
+proof (cases "findFiance eng w")
+  case None
+  thus ?thesis by simp
+next
+  case (Some m)
+  thus ?thesis by simp
+qed
+
+lemma married_better_imp:
+  assumes "findFiance eng_1 w = Some m_1" and "married_better w WPrefs eng_1 eng_2"
+  shows "\<exists>m_2. (findFiance eng_2 w = Some m_2 \<and> (m_1 = m_2 \<or> prefers w WPrefs m_2 m_1))"
+proof -
+  from assms obtain m_2 where m_2:"findFiance eng_2 w = Some m_2" by fastforce
+  have "findFiance eng_2 w = Some m_2 \<and> (m_1 = m_2 \<or> prefers w WPrefs m_2 m_1)"
+  proof cases
+    assume "m_1 = m_2"
+    with m_2 show ?thesis by blast
+  next
+    assume "m_1 \<noteq> m_2"
+    with assms m_2 show ?thesis by fastforce 
+  qed
+  thus ?thesis by blast
+qed
 
 lemma married_better_trans:
-  assumes 0:"married_better w WPrefs eng_1 eng_2" and 1:"married_better w WPrefs eng_2 eng_3"
-    shows "married_better w WPrefs eng_1 eng_3"
-proof -
-  let ?m_1 = "the (findFiance eng_1 w)"
-  let ?m_2 = "the (findFiance eng_2 w)"
-  let ?m_3 = "the (findFiance eng_3 w)"
-  from 0 have "findFiance eng_1 w = None \<or> (findFiance eng_1 w \<noteq> None \<and> findFiance eng_2 w \<noteq> None \<and> (?m_1 = ?m_2 \<or> prefers w WPrefs ?m_2 ?m_1))" by (metis married_better.simps)
+  assumes 12:"married_better w WPrefs eng_1 eng_2" and 23:"married_better w WPrefs eng_2 eng_3"
+  shows "married_better w WPrefs eng_1 eng_3"
+proof (cases "findFiance eng_1 w")
+  case None
+  thus ?thesis by simp
+next
+  case (Some m_1)
+  then obtain m_2 where m_2:"findFiance eng_2 w = Some m_2" using 12 by force
+  then obtain m_3 where m_3:"findFiance eng_3 w = Some m_3" using 23 by force
+  with m_2 23 married_better_imp have imp_23:"m_2 = m_3 \<or> prefers w WPrefs m_3 m_2" by fastforce
+  from Some m_2 12 married_better_imp have "m_1 = m_2 \<or> prefers w WPrefs m_2 m_1" by fastforce
   thus ?thesis
   proof
-    assume "findFiance eng_1 w = None"
-    thus ?thesis by (metis married_better.simps)
+    assume "m_1 = m_2"
+    with imp_23 show ?thesis using Some m_3 by auto
   next
-    assume asm:"findFiance eng_1 w \<noteq> None \<and> findFiance eng_2 w \<noteq> None \<and> (?m_1 = ?m_2 \<or> prefers w WPrefs ?m_2 ?m_1)"
-    hence married_2:"findFiance eng_2 w \<noteq> None" by simp
-    with 1 have married_3:"findFiance eng_3 w \<noteq> None" by (metis married_better.simps)
-    from married_2 1 have "(?m_2 = ?m_3 \<or> prefers w WPrefs ?m_3 ?m_2)" by (metis married_better.simps)
-    moreover from asm have "?m_1 = ?m_2 \<or> prefers w WPrefs ?m_2 ?m_1" by simp
-    ultimately have "?m_1 = ?m_3 \<or> prefers w WPrefs ?m_3 ?m_1" using prefers_trans by metis
-    thus ?thesis using married_3 by (metis married_better.simps)
+    assume imp_12:"prefers w WPrefs m_2 m_1"
+    from imp_23 show ?thesis
+    proof
+      assume "m_2 = m_3"
+      thus ?thesis using imp_12 Some m_3 by fastforce
+    next
+      assume "prefers w WPrefs m_3 m_2"
+      with imp_12 prefers_trans have "prefers w WPrefs m_3 m_1" by blast
+      with Some m_3 show ?thesis by fastforce
+    qed
   qed
 qed
 
@@ -1120,12 +1144,10 @@ proof -
       moreover have "is_distinct (replicate N None)" by simp
       ultimately have "married_better (MPrefs!m!prop_idx) WPrefs (fst(seq!j)) (fst(seq!i))" using GS'_arg_seq_all_w_marry_better seq i by metis
       hence "married_better (MPrefs!m!prop_idx) WPrefs (fst(seq!j)) engagements" using i by simp
-      thus ?thesis using j by (metis married_better.simps)
+      thus ?thesis using j married_better_imp by blast 
     qed
   qed
-  from assms(2) have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
-  with `m < N` have "m < length MPrefs" by simp
-  with assms(2) have perm:"(MPrefs!m) <~~> [0 ..< N]" by (metis is_valid_pref_matrix.simps nth_mem is_perm)
+  from assms(2) `m<N` have perm:"MPrefs!m <~~> [0 ..< N]" using perm_PPref by metis
   moreover have "length [0 ..< N] = N" by simp
   ultimately have "length (MPrefs!m) = N" by (metis perm_length)
   hence "\<forall>w \<in> set (MPrefs!m). findFiance engagements w \<noteq> None" using w_all_still_married by (metis in_set_conv_nth)
@@ -1265,7 +1287,7 @@ lemma noFree:
 proof -
   let ?seq = "GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
   let ?result = "Gale_Shapley MPrefs WPrefs"
-  from assms have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
+  from assms(1) have "length MPrefs = N" using length_PPrefs by blast
   hence "?result = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" by (simp add:Let_def)
   hence result:"?result = fst(last ?seq)" by (metis GS'_arg_seq_computes_GS')
 
@@ -1328,10 +1350,7 @@ next
       qed
     qed
 
-    from Suc.prems(2) have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
-    moreover from Suc.prems(2) have "\<forall>MPref \<in> set MPrefs. is_perm MPref [0 ..< N]" by (metis is_valid_pref_matrix.simps)
-    ultimately have "is_perm (MPrefs!m) [0 ..< N]" using `m < N` by simp
-    hence perm:"MPrefs!m <~~> [0 ..< N]" by (metis is_perm)
+    from Suc.prems(2) `m<N` have perm:"MPrefs!m <~~> [0 ..< N]" using perm_PPref by blast
     hence "length (MPrefs!m) = N" by (simp add:perm_length)
     with prop_idx have "?w \<in> set (MPrefs!m)" by simp
     with perm in_perm_upt have "?w < N" by metis
@@ -1371,7 +1390,7 @@ lemma bounded:
 proof -
   let ?seq = "GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
   let ?result = "Gale_Shapley MPrefs WPrefs"
-  from assms have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
+  from assms have "length MPrefs = N" using length_PPrefs by blast
   hence "?result = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" by (simp add:Let_def)
   hence result:"?result = fst(last ?seq)" by (metis GS'_arg_seq_computes_GS')
 
@@ -1388,7 +1407,7 @@ theorem is_matching:
 proof -
   let ?seq = "GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
   let ?result = "Gale_Shapley MPrefs WPrefs"
-  from assms have "length MPrefs = N" by (metis is_valid_pref_matrix.simps)
+  from assms have "length MPrefs = N" using length_PPrefs by blast
   hence "?result = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" by (simp add:Let_def)
   hence result:"?result = fst(last ?seq)" by (metis GS'_arg_seq_computes_GS')
 
