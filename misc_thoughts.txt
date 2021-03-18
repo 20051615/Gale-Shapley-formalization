@@ -4,22 +4,9 @@ fringe/extensions
 -split GS.thy into multiple files???
 
 do
+-use try0 everywhere to shorten proofs
+-unify gs'-arg-seq to all use index form
 -eventually: remove unused lemmas
--isabelle/hol has tail-recursion facilities via partial_function command. Make use of it because my GS is indeed tail-recursive. Make GS tale-recursive, and recognized as such by isabelle/hol
 -a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
--is termination automatically checked?
-	in terms of termination, basically do exactly what coq paper did.
-	just follow the coq paper "introducing a measure for termination" and see how you might do this in isabelle/hol. it's pretty, gets rid of n^2.
 -run codegen for evaluation purposes?
--multiple proof methods: 1 sim to coq; 2 sim to standard english-text proof (by contradiction, i think) (see wikipedia; probably need to encode temporality somehow)
 -submit to afp
--consider explicitly reasoning about the sequence of arguments that get formed (a list, starting from the one with measure N * N and ending with noFree -- which could have measure equal to 0 or larger). First form a bunch of lemmas that tie this sequence to the function itself (in particular to GS'-started-with-[None,..][0,...]) via equalities
-
-double-check
-1. that i have, somewhere in my theory, implicitly needed to prove the fact that GS terminates (referring to the wikipedia english-text argument arguing about termination, ie no one is left unmarried). (ie certifying termination for isabelle isnt enough; i need to also conceptually certify termination just as wikipedia does; check that the english-text wikipedia logic is eventually encoded in my completeness (bijection) certification instead, and that it isnt missing)
-
-
-termination thoughts
-1. make gs' a partial function, where only length eng = length prog arguments are within its domain, (prove that length eng = length prog is sufficient to lead to termination of gs')
-2. then refine and prove that sum = N*N actually implies ==> no free, and get rid of the explicit sum > N*N exit.
-3. try to see if there is tailored-support for tail-recursive functions in isabelle/hol (and ultimately, tailored-support for state invariants on arguments passed around by a tail-recursive function). didnt find anything yet? keep googling, tail recursion, isabelle hol. "partial_function command????"
