@@ -7,134 +7,32 @@ type_synonym woman = "person"
 type_synonym pref_matrix = "(person list) list"
 type_synonym matching = "(woman option) list"
 
-lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]"
-proof
-  show "x < k \<Longrightarrow> x \<in> set [0 ..< k]"
-  proof (induction k)
-    case 0
-    thus ?case by simp
-  next
-    case (Suc k_1)
-    hence "x < k_1 \<or> x = k_1" by auto
-    thus ?case
-    proof
-      assume "x < k_1"
-      with Suc.IH have "x \<in> set [0..<k_1]" .
-      thus ?case by auto
-    next
-      assume "x = k_1"
-      thus ?case by auto
-    qed
-  qed
-next
-  show "x \<in> set [0 ..< k] \<Longrightarrow> x < k"
-  proof (induction k)
-    case 0
-    thus ?case by simp
-  next
-    case (Suc k_1)
-    hence "x \<in> set [0..<k_1] \<or> x = k_1" by auto
-    thus ?case
-    proof
-      assume "x \<in> set [0..<k_1]"
-      thus ?case using Suc.IH by simp
-    next
-      assume "x = k_1"
-      thus ?case by simp
-    qed
-  qed
-qed
+lemma in_upt:"x < k \<longleftrightarrow> x \<in> set [0 ..< k]" by simp
+lemma in_perm_upt: "x < k \<longleftrightarrow> (\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A)" using in_upt perm_refl perm_set_eq by metis
 
-lemma in_perm_upt: "x < k \<longleftrightarrow> (\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A)"
-proof
-  assume "x < k"
-  show "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A"
-  proof
-    from in_upt `x<k` perm_refl show "[0 ..< k] <~~> [0 ..< k] \<and> x \<in> set [0 ..< k]" by metis
-  qed
-next
-  assume "\<exists>A. A <~~> [0 ..< k] \<and> x \<in> set A"
-  then obtain A where A:"A <~~> [0 ..< k] \<and> x \<in> set A" by blast
-  with perm_set_eq in_upt show "x < k" by metis
-qed
-
-fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where
-"is_perm A B = (mset A = mset B)"
-lemma is_perm:"is_perm A B \<Longrightarrow> A <~~> B" by (metis is_perm.simps mset_eq_perm)
-
+fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where "is_perm A B = (mset A = mset B)"
+lemma is_perm:"is_perm A B \<longleftrightarrow> A <~~> B" using is_perm.simps mset_eq_perm by metis
 fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" where
 "is_valid_pref_matrix N PPrefs = (if length PPrefs \<noteq> N then False else Ball (set PPrefs) (\<lambda>PPref. is_perm PPref [0 ..< N]))"
 
 fun findFreeMan::"matching \<Rightarrow> man option" where
-"findFreeMan engagements = find_idx (\<lambda>wo. wo = None) engagements"
-lemma findFreeMan_bound:"findFreeMan engagements = Some m \<Longrightarrow> m < length engagements" by (auto intro:find_idx_bound)
-lemma findFreeMan_None:"findFreeMan engagements = None \<longleftrightarrow> (\<forall>wo\<in>set engagements. wo \<noteq> None)"
-proof
-  let ?F = "\<lambda>wo. wo = None"
-  from find_idx_None have "find_idx pred xs = None \<Longrightarrow> (\<forall>x\<in>set xs. \<not>pred x)" for pred xs by metis
-  hence "find_idx ?F engagements = None \<Longrightarrow> (\<forall>x \<in>set engagements. \<not>?F x)" by blast
-  thus "findFreeMan engagements = None \<Longrightarrow> (\<forall>wo\<in>set engagements. wo \<noteq> None)" by (metis findFreeMan.simps)
-next
-  let ?F = "\<lambda>wo. wo = None"
-  from find_idx_None have 0:"(\<forall>x\<in>set xs. \<not>pred x) \<Longrightarrow> find_idx pred xs = None" for pred xs by metis
-  have "(\<forall>x\<in>set engagements. \<not>?F x) \<Longrightarrow> find_idx ?F engagements = None" by (simp add:0)
-  thus "(\<forall>wo\<in>set engagements. wo \<noteq> None) \<Longrightarrow> findFreeMan engagements = None" by simp
-qed
-lemma findFreeMan:"findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None"
-proof -
-  from find_idx_Some find_idx have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> pred (xs ! the (find_idx pred xs))" for pred xs by metis
-  thus "findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None" using findFreeMan.elims by fastforce
-qed
+"findFreeMan engagements = find_idx None engagements"
+lemma findFreeMan_bound:"findFreeMan engagements = Some m \<Longrightarrow> m < length engagements" using find_idx_bound by simp
+lemma findFreeMan_None:"findFreeMan engagements = None \<longleftrightarrow> None \<notin> set engagements" using find_idx_None by fastforce
+lemma findFreeMan:"findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None" using find_idx find_idx_Some by fastforce
 
 fun findFiance::"matching \<Rightarrow> woman \<Rightarrow> man option" where
-"findFiance engagements w = find_idx (\<lambda>wo. wo = Some w) engagements"
-lemma findFiance_bound:"findFiance engagements w = Some m' \<Longrightarrow> m' < length engagements" by (auto intro:find_idx_bound)
-lemma findFiance_Some:"findFiance engagements w \<noteq> None \<Longrightarrow> Some w \<in> set engagements"
-proof -
-  assume "findFiance engagements w \<noteq> None"
-  hence "\<exists>idx. findFiance engagements w = Some idx" by auto
-  moreover from find_idx_Some have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> \<exists>x \<in> set xs. pred x" for pred xs by metis
-  ultimately have "\<exists>wo \<in> set engagements. wo = Some w" by auto
-  thus ?thesis by simp
-qed
-lemma findFiance_None:"findFiance engagements w = None \<Longrightarrow> \<forall>wo\<in>set engagements. wo \<noteq> Some w"
-proof -
-  have "find_idx pred xs = None \<Longrightarrow> \<forall>x\<in>set xs. \<not>pred x" for pred xs using find_idx_None by metis
-  thus "findFiance engagements w = None \<Longrightarrow> \<forall>wo\<in>set engagements. wo\<noteq>Some w" by auto
-qed
-lemma findFiance_Some_is_first:
-  assumes 0:"findFiance engagements w = Some m" and 1:"m' < m"
-    shows "engagements!m' \<noteq> Some w"
-proof -
-  let ?F = "\<lambda>wo. wo = Some w"
-  from 0 have "find_idx ?F engagements = Some m" by simp
-  with 1 find_idx_Some_is_first show ?thesis by auto
-qed
-lemma findFiance_first_is_Some:
-  assumes 0:"m < length engagements" and 1:"\<forall>m'<m. engagements!m'\<noteq>Some w"
-      and 2:"engagements!m = Some w"
-    shows "findFiance engagements w = Some m"
-proof -
-  let ?F = "\<lambda>wo. wo = Some w"
-  from 1 have "\<forall>m'<m. \<not> ?F (engagements!m')" by simp
-  moreover from 2 have "?F (engagements!m)" by simp
-  ultimately have "find_idx ?F engagements = Some m" using 0 by (simp add: find_idx_first_is_Some)
-  thus ?thesis by simp
-qed
-lemma findFiance:"findFiance engagements w = Some m' \<Longrightarrow> engagements!m' = Some w"
-proof -
-  from find_idx_Some find_idx have "\<exists>idx. find_idx pred xs = Some idx \<Longrightarrow> pred (xs ! the (find_idx pred xs))" for pred xs by metis
-  thus "findFiance engagements w = Some m' \<Longrightarrow> engagements!m' = Some w" using findFiance.elims by fastforce
-qed
+"findFiance engagements w = find_idx (Some w) engagements"
+lemma findFiance_bound:"findFiance engagements w = Some m \<Longrightarrow> m < length engagements" using find_idx_bound by simp
+lemma findFiance_Some:"findFiance engagements w \<noteq> None \<longleftrightarrow> Some w \<in> set engagements" using find_idx_Some by fastforce
+lemma findFiance_None:"findFiance engagements w = None \<longleftrightarrow> Some w \<notin> set engagements" using findFiance_Some by blast
+lemma findFiance_Some_is_first:"\<lbrakk>findFiance engagements w = Some m; m' < m\<rbrakk> \<Longrightarrow> engagements!m' \<noteq> Some w" using find_idx_Some_is_first by fastforce
+lemma findFiance_first_is_Some:"\<lbrakk>m < length engagements; \<forall>m'<m. engagements!m'\<noteq>Some w; engagements!m = Some w\<rbrakk> \<Longrightarrow> findFiance engagements w = Some m" using find_idx_first_is_Some by force
+lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagements!m = Some w" using find_idx find_idx_Some by fastforce
 
 fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
-"findPerson ps p = find_idx (\<lambda>p'. p' = p) ps"
-lemma findPerson_Some:"p \<in> set ps \<Longrightarrow> \<exists>idx. findPerson ps p = Some idx"
-proof -
-  from find_idx_Some have "\<exists>x\<in>set xs. pred x \<Longrightarrow> \<exists>idx. find_idx pred xs = Some idx" for pred xs by metis
-  thus "p \<in> set ps \<Longrightarrow> \<exists>idx. findPerson ps p = Some idx" by fastforce
-qed
-lemma findPerson:"p \<in> set ps \<Longrightarrow> ps!(the (findPerson ps p)) = p" by (auto intro:find_idx)
+"findPerson ps p = find_idx p ps"
+lemma findPerson_Some:"findPerson ps p \<noteq> None \<longleftrightarrow> p \<in> set ps" using find_idx_Some by fastforce
 
 fun prefers::"person \<Rightarrow> pref_matrix \<Rightarrow> person \<Rightarrow> person \<Rightarrow> bool" where
 "prefers p PPrefs p1 p2 = (
@@ -739,7 +637,7 @@ proof -
   ultimately have "set ?engagements = set [0 ..< ?N]" by (metis card_subset_eq)
   moreover have "distinct [0 ..< ?N]" by simp
   ultimately have "mset ?engagements = mset [0 ..< ?N]" using `distinct ?engagements` by (metis set_eq_iff_mset_eq_distinct)
-  moreover have "mset xs = mset ys \<Longrightarrow> mset (map Some xs) = mset (map Some ys)" for xs ys by simp
+  moreover have "mset (xs::nat list) = mset ys \<Longrightarrow> mset (map Some xs) = mset (map Some ys)" for xs ys by simp
   ultimately have "mset (map Some ?engagements) = mset (map Some [0..<?N])" by metis
   thus ?thesis by (metis engagements mset_eq_perm)
 qed
@@ -767,7 +665,7 @@ proof (induction N MPrefs WPrefs engagements prop_idxs rule:GS'_arg_seq.induct)
       show ?case
       proof (cases "findFiance engagements ?w")
         case None
-        hence "\<forall> m < length engagements. engagements!m \<noteq> Some ?w" using findFiance_None by simp
+        hence "\<forall>m < length engagements. engagements!m \<noteq> Some ?w" by (metis nth_mem findFiance_None)
         with "1.prems" have "is_distinct (engagements[m:=Some ?w])" by (metis (full_types) length_list_update nth_list_update nth_list_update_neq)
         moreover from "1.prems"(2) not_init non_terminal m None have "(X, Y) \<in> set (GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs)" by (auto simp add:Let_def)
         ultimately show ?thesis using "1.IH"(1) non_terminal m None by simp
