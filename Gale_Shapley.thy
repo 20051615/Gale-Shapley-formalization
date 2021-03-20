@@ -160,7 +160,7 @@ qed
 lemma GS'_arg_seq_fst_0:"fst((GS'_arg_seq N MPrefs WPrefs engagements prop_idxs)!0) = engagements" using GS'_arg_seq_0 by auto
 lemma GS'_arg_seq_snd_0:"snd((GS'_arg_seq N MPrefs WPrefs engagements prop_idxs)!0) = prop_idxs" using GS'_arg_seq_0 by force
 
-lemma GS'_arg_seq_snd_1: (* prove this using _step instead? *)
+lemma GS'_arg_seq_snd_1: (* prove this using _step instead? *) (* prove a general case of this using _step, and instantiate this. as a simp rule too, use simp del *)
   assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
       and non_terminal:"\<not>is_terminal N engagements prop_idxs"
       and m:"findFreeMan engagements = Some m"
