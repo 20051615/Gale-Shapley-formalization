@@ -6,6 +6,7 @@ fringe/extensions
 do
 -use try0 everywhere to shorten proofs
 -unify gs'-arg-seq to all use index form
+-change marry_better lemma from i<j to i<=j
 -eventually: remove unused lemmas
 -a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
 -run codegen for evaluation purposes?
