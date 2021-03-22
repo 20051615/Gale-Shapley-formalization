@@ -158,37 +158,6 @@ next
     by (simp_all add:Let_def)
 qed
 
-lemma GS'_arg_seq_snd_1: (* prove this using _step instead? *) (* prove a general case of this using _step, and instantiate this. as a simp rule too, use simp del *)
-  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
-      and non_terminal:"\<not>is_terminal N engagements prop_idxs"
-      and m:"findFreeMan engagements = Some m"
-    shows "snd(seq!1) = prop_idxs[m:=Suc(prop_idxs!m)]"
-proof -
-  let ?w = "MPrefs!m!(prop_idxs!m)"
-  let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
-  show ?thesis
-  proof (cases "findFiance engagements ?w")
-    case None
-    let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
-    from non_terminal m None seq have "seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-    thus ?thesis by (simp del:GS'_arg_seq.simps)
-  next
-    case (Some m')
-    show ?thesis
-    proof cases
-      assume change:"prefers ?w WPrefs m m'"
-      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
-      from non_terminal m Some change seq have "seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-      thus ?thesis by (simp del:GS'_arg_seq.simps)
-    next
-      assume no_change:"\<not> prefers ?w WPrefs m m'"
-      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-      from non_terminal m Some no_change seq have "seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-      thus ?thesis by (simp del:GS'_arg_seq.simps)
-    qed
-  qed
-qed
-
 lemma GS'_arg_seq_last_is_terminal:"(X, Y) = last (GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) \<Longrightarrow> is_terminal N X Y"
 proof (induction "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" arbitrary:engagements prop_idxs)
   case Nil
@@ -540,6 +509,28 @@ proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_
     qed
   qed
 qed
+
+lemma GS'_arg_seq_snd_step:
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+      and "i < length seq" and "seq!i = (X, Y)"
+      and "\<not>is_terminal N X Y" and "findFreeMan X = Some m"
+    shows "snd(seq!Suc i) = Y[m:=Suc(Y!m)]"
+proof (cases "findFiance X (MPrefs!m!(Y!m))")
+  case None
+  with assms GS'_arg_seq_step_1 show ?thesis by (simp del:GS'_arg_seq.simps)
+next
+  case (Some m')
+  show ?thesis
+  proof (cases "prefers (MPrefs!m!(Y!m)) WPrefs m m'")
+    case True
+    with assms Some GS'_arg_seq_step_2 show ?thesis by (simp del:GS'_arg_seq.simps)
+  next
+    case False
+    with assms Some GS'_arg_seq_step_3 show ?thesis by (simp del:GS'_arg_seq.simps)
+  qed
+qed
+
+lemma GS'_arg_seq_snd_1:"\<lbrakk>\<not>is_terminal N engagements prop_idxs; findFreeMan engagements = Some m\<rbrakk> \<Longrightarrow> snd((GS'_arg_seq N MPrefs WPrefs engagements prop_idxs)!1) = prop_idxs[m:=Suc(prop_idxs!m)]" using GS'_arg_seq_non_Nil GS'_arg_seq_snd_step by (simp del:GS'_arg_seq.simps)
 
 abbreviation is_distinct where
 "is_distinct engagements \<equiv> \<forall> m1 < length engagements.
