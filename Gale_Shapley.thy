@@ -365,51 +365,48 @@ qed
 lemma GS'_arg_seq_step_1:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; seq!i = (X, Y); \<not>is_terminal N X Y; findFreeMan X = Some m; w = MPrefs!m!(Y!m); findFiance X w = None\<rbrakk> \<Longrightarrow> seq!Suc i = (X[m:=Some w], Y[m:=Suc(Y!m)])"
 proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_arg_seq.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
-  show ?case
-  proof cases
+  have non_terminal:"\<not>is_terminal N engagements prop_idxs"
+  proof
     assume "is_terminal N engagements prop_idxs"
-    moreover with "1.prems"(1) have "seq = [(engagements, prop_idxs)]" by auto
-    ultimately have False using "1.prems"(2-4) by simp
-    thus ?case by simp
+    moreover with "1.prems"(1) have "seq = [(engagements, prop_idxs)]" by force
+    ultimately show False using "1.prems"(2-4) by simp
+  qed
+  then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by blast
+  let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
+  let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
+  show ?case
+  proof (cases i)
+    case 0
+    with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
+    with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs (X[m:=Some w]) (Y[m:=Suc(Y!m)])" by (simp add:Let_def)
+    with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
   next
-    assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
-    then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by auto
-    let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
-    let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
-    show ?case
-    proof (cases i)
-      case 0
-      with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
-      with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs (X[m:=Some w]) (Y[m:=Suc(Y!m)])" by (simp add:Let_def)
-      with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
+    case (Suc i_1)
+    show ?thesis
+    proof (cases "findFiance engagements ?w")
+      case None
+      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
+      from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+      with "1.IH"(1) non_terminal m_0 None "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
+      with seq_tl Suc show ?thesis by simp
     next
-      case (Suc i_1)
+      case (Some m')
       show ?thesis
-      proof (cases "findFiance engagements ?w")
-        case None
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
-        from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      proof cases
+        assume change:"prefers ?w WPrefs m_0 m'"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m':=None]) ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
         with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-        with "1.IH"(1) non_terminal m_0 None "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
+        with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
         with seq_tl Suc show ?thesis by simp
       next
-        case (Some m')
-        show ?thesis
-        proof cases
-          assume change:"prefers ?w WPrefs m_0 m'"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m':=None]) ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        next
-          assume no_change:"\<not>prefers ?w WPrefs m_0 m'"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        qed
+        assume no_change:"\<not>prefers ?w WPrefs m_0 m'"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+        with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+        with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-7) have "?seq_tl!Suc i_1 = (X[m:=Some w], Y[m:=Suc(Y!m)])" by metis
+        with seq_tl Suc show ?thesis by simp
       qed
     qed
   qed
@@ -418,51 +415,48 @@ qed
 lemma GS'_arg_seq_step_2:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; seq!i = (X, Y); \<not>is_terminal N X Y; findFreeMan X = Some m; w = MPrefs!m!(Y!m); findFiance X w = Some m'; prefers w WPrefs m m'\<rbrakk> \<Longrightarrow> seq!Suc i = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])"
 proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_arg_seq.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
-  show ?case
-  proof cases
+  have non_terminal:"\<not>is_terminal N engagements prop_idxs"
+  proof
     assume "is_terminal N engagements prop_idxs"
     moreover with "1.prems"(1) have "seq = [(engagements, prop_idxs)]" by auto
-    ultimately have False using "1.prems"(2-4) by simp
-    thus ?case by simp
+    ultimately show False using "1.prems"(2-4) by simp
+  qed
+  then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by blast
+  let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
+  let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
+  show ?case
+  proof (cases i)
+    case 0
+    with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
+    with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs (X[m:=Some w, m':=None]) (Y[m:=Suc(Y!m)])" by (auto simp add:Let_def)
+    with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
   next
-    assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
-    then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by auto
-    let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
-    let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
-    show ?case
-    proof (cases i)
-      case 0
-      with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
-      with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs (X[m:=Some w, m':=None]) (Y[m:=Suc(Y!m)])" by (auto simp add:Let_def)
-      with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
+    case (Suc i_1)
+    show ?thesis
+    proof (cases "findFiance engagements ?w")
+      case None
+      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
+      from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+      with "1.IH"(1) non_terminal m_0 None "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
+      with seq_tl Suc show ?thesis by simp
     next
-      case (Suc i_1)
+      case (Some m'_0)
       show ?thesis
-      proof (cases "findFiance engagements ?w")
-        case None
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
-        from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      proof cases
+        assume change:"prefers ?w WPrefs m_0 m'_0"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m'_0:=None]) ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
         with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-        with "1.IH"(1) non_terminal m_0 None "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
+        with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
         with seq_tl Suc show ?thesis by simp
       next
-        case (Some m'_0)
-        show ?thesis
-        proof cases
-          assume change:"prefers ?w WPrefs m_0 m'_0"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m'_0:=None]) ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        next
-          assume no_change:"\<not>prefers ?w WPrefs m_0 m'_0"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        qed
+        assume no_change:"\<not>prefers ?w WPrefs m_0 m'_0"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+        with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+        with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X[m:=Some w, m':=None], Y[m:=Suc(Y!m)])" by metis
+        with seq_tl Suc show ?thesis by simp
       qed
     qed
   qed
@@ -471,51 +465,48 @@ qed
 lemma GS'_arg_seq_step_3:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; i < length seq; seq!i = (X, Y); \<not>is_terminal N X Y; findFreeMan X = Some m; w = MPrefs!m!(Y!m); findFiance X w = Some m'; \<not>prefers w WPrefs m m'\<rbrakk> \<Longrightarrow> seq!Suc i = (X, Y[m:=Suc(Y!m)])"
 proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i rule:GS'_arg_seq.induct)
   case (1 N MPrefs WPrefs engagements prop_idxs)
-  show ?case
-  proof cases
+  have non_terminal:"\<not>is_terminal N engagements prop_idxs"
+  proof
     assume "is_terminal N engagements prop_idxs"
     moreover with "1.prems"(1) have "seq = [(engagements, prop_idxs)]" by auto
-    ultimately have False using "1.prems"(2-4) by simp
-    thus ?case by simp
+    ultimately show False using "1.prems"(2-4) by simp
+  qed
+  then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by blast
+  let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
+  let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
+  show ?case
+  proof (cases i)
+    case 0
+    with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
+    with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs X (Y[m:=Suc(Y!m)])" by (auto simp add:Let_def)
+    with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
   next
-    assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
-    then obtain m_0 where m_0:"findFreeMan engagements = Some m_0" by auto
-    let ?w = "MPrefs!m_0!(prop_idxs!m_0)"
-    let ?next_prop_idxs = "prop_idxs[m_0:=Suc(prop_idxs!m_0)]"
-    show ?case
-    proof (cases i)
-      case 0
-      with "1.prems"(1-3) have "(X, Y) = (engagements, prop_idxs)" by (simp del:GS'_arg_seq.simps)
-      with "1.prems" have "seq = (X, Y) # GS'_arg_seq N MPrefs WPrefs X (Y[m:=Suc(Y!m)])" by (auto simp add:Let_def)
-      with 0 show ?thesis by (simp del:GS'_arg_seq.simps)
+    case (Suc i_1)
+    show ?thesis
+    proof (cases "findFiance engagements ?w")
+      case None
+      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
+      from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+      with "1.IH"(1) non_terminal m_0 None "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
+      with seq_tl Suc show ?thesis by simp
     next
-      case (Suc i_1)
+      case (Some m'_0)
       show ?thesis
-      proof (cases "findFiance engagements ?w")
-        case None
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w]) ?next_prop_idxs"
-        from "1.prems"(1) non_terminal m_0 None have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+      proof cases
+        assume change:"prefers ?w WPrefs m_0 m'_0"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m'_0:=None]) ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
         with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-        with "1.IH"(1) non_terminal m_0 None "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
+        with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
         with seq_tl Suc show ?thesis by simp
       next
-        case (Some m'_0)
-        show ?thesis
-        proof cases
-          assume change:"prefers ?w WPrefs m_0 m'_0"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m_0:=Some ?w, m'_0:=None]) ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(2) non_terminal m_0 Some change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        next
-          assume no_change:"\<not>prefers ?w WPrefs m_0 m'_0"
-          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-          from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
-          with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
-          with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
-          with seq_tl Suc show ?thesis by simp
-        qed
+        assume no_change:"\<not>prefers ?w WPrefs m_0 m'_0"
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+        from "1.prems"(1) non_terminal m_0 Some no_change have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" by (simp add:Let_def)
+        with "1.prems"(2-3) Suc have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X, Y)" by auto
+        with "1.IH"(3) non_terminal m_0 Some no_change "1.prems"(4-8) have "?seq_tl!Suc i_1 = (X, Y[m:=Suc(Y!m)])" by metis
+        with seq_tl Suc show ?thesis by simp
       qed
     qed
   qed
@@ -532,11 +523,11 @@ proof (cases "findFiance X (MPrefs!m!(Y!m))")
 next
   case (Some m')
   show ?thesis
-  proof (cases "prefers (MPrefs!m!(Y!m)) WPrefs m m'")
-    case True
+  proof cases
+    assume "prefers (MPrefs!m!(Y!m)) WPrefs m m'"
     with assms Some GS'_arg_seq_step_2 show ?thesis by (simp del:GS'_arg_seq.simps)
   next
-    case False
+    assume "\<not>prefers (MPrefs!m!(Y!m)) WPrefs m m'"
     with assms Some GS'_arg_seq_step_3 show ?thesis by (simp del:GS'_arg_seq.simps)
   qed
 qed
@@ -615,17 +606,15 @@ proof -
                                                m1 \<noteq> m2 \<longrightarrow> engagements!m1 \<noteq> engagements!m2" by blast
   with noFree have "\<forall>m1 < length engagements. \<forall>m2 < length engagements.
                      m1 \<noteq> m2 \<longrightarrow> the (engagements!m1) \<noteq> the (engagements!m2)" by (metis option.expand)
-  hence "distinct ?engagements" by (simp add: distinct_conv_nth)
+  hence distinct:"distinct ?engagements" by (simp add: distinct_conv_nth)
   hence "card (set ?engagements) = length ?engagements" by (metis distinct_card)
-  hence "card (set ?engagements) = ?N" by simp
-  moreover have "finite (set [0 ..< ?N])" by simp
-  moreover have "card (set [0 ..< ?N]) = ?N" by simp
-  ultimately have "set ?engagements = set [0 ..< ?N]" using subset by (metis card_subset_eq)
-  moreover have "distinct [0 ..< ?N]" by simp
-  ultimately have "mset ?engagements = mset [0 ..< ?N]" using `distinct ?engagements` by (metis set_eq_iff_mset_eq_distinct)
+  also have "... = ?N" by simp
+  finally have "card (set ?engagements) = ?N" .
+  moreover have "finite (set [0 ..< ?N])" and "card (set [0 ..< ?N]) = ?N" and "distinct [0 ..< ?N]" by simp_all
+  ultimately have "mset ?engagements = mset [0 ..< ?N]" using subset distinct by (metis card_subset_eq set_eq_iff_mset_eq_distinct)
   moreover have "mset (xs::nat list) = mset ys \<Longrightarrow> mset (map Some xs) = mset (map Some ys)" for xs ys by simp
-  ultimately have "mset (map Some ?engagements) = mset (map Some [0..<?N])" by metis
-  thus ?thesis by (metis engagements mset_eq_perm)
+  ultimately have "mset (map Some ?engagements) = mset (map Some [0..<?N])" by meson
+  thus ?thesis using engagements by (metis mset_eq_perm)
 qed
 
 lemma GS'_arg_seq_all_distinct:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; is_distinct engagements; i < length seq; seq!i = (X, Y)\<rbrakk> \<Longrightarrow> is_distinct X"
@@ -929,47 +918,46 @@ proof -
   proof (rule ccontr)
     assume asm:"\<not>(Y_prev!m = k \<or> (Y_prev!m = k_1 \<and> findFreeMan X_prev = Some m))"
     have "Y = ?next_prop_idxs" using GS'_arg_seq_snd_step seq i_1_bound seq_i_1 non_terminal m_prev i_1 seq_i by fastforce
-    hence assms_7:"?next_prop_idxs!m = k" using assms(7) by simp
+    hence is_k:"?next_prop_idxs!m = k" using `Y!m=k` by simp
     show False
     proof cases
       assume "m = m_prev"
       with asm m_prev have "Y_prev!m \<noteq> k_1" by blast
       moreover from m_prev findFreeMan_bound non_terminal `m=m_prev` have "m < length Y_prev" by metis
-      ultimately show False using `m=m_prev` assms_7 k_1 by simp
+      ultimately show False using `m=m_prev` is_k k_1 by simp
     next
       assume "m \<noteq> m_prev"
-      with asm assms_7 show False by auto
+      with asm is_k show False by simp
     qed
   qed
 qed
 
 lemma GS'_arg_seq_exists_prev_prop_idx:
   assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs engagements (replicate N 0)"
-      and "i < length seq" and "0 < i" and "k > 0" and "m < N" and "snd(seq!i)!m = k"
-    shows "\<exists>j < i. snd(seq!j)!m = k - 1 \<and> findFreeMan (fst(seq!j)) = Some m"
+      and "i < length seq" and i_1:"i = Suc i_1" and "seq!i = (X, Y)" 
+      and k_1:"k = Suc k_1" and "m < N" and "Y!m = k"
+    shows "\<exists>j X_prev Y_prev. j < i \<and> seq!j = (X_prev, Y_prev) \<and> Y_prev!m = k_1 \<and> findFreeMan X_prev = Some m"
 proof (rule ccontr)
-  assume asm:"\<not> (\<exists>j < i. snd(seq!j)!m = k - 1 \<and> findFreeMan (fst(seq!j)) = Some m)"
-  have "j < i \<Longrightarrow> snd(seq!j)!m = k" for j
-  proof (induction "i - j - 1" arbitrary: j)
+  assume asm:"\<not> (\<exists>j X_prev Y_prev. j < i \<and> seq!j = (X_prev, Y_prev) \<and> Y_prev!m = k_1 \<and> findFreeMan X_prev = Some m)"
+  have "\<lbrakk>j < i; seq!j = (X_prev, Y_prev)\<rbrakk> \<Longrightarrow> Y_prev!m = k" for j X_prev Y_prev
+  proof (induction "i-1 - j" arbitrary: j X_prev Y_prev)
     case 0
-    hence "j = i - 1" by simp
-    with `0 < i` have "j < i" by simp
-    from assms `j = i - 1` have "snd(seq!j)!m = k \<or> (snd(seq!(j))!m = k - 1 \<and> findFreeMan (fst(seq!(j))) = Some m)"
-      by (metis GS'_arg_seq_prev_prop_idx_same_or_1_less)
-    with asm `j < i` show ?case by blast
+    with i_1 have "j = i_1" by auto
+    hence "Y_prev!m = k \<or> (Y_prev!m = k_1 \<and> findFreeMan X_prev = Some m)" using GS'_arg_seq_prev_prop_idx_same_or_1_less assms "0.prems"(2) by blast
+    with asm "0.prems" show ?case by blast
   next
     case (Suc d)
-    hence "snd(seq!Suc j)!m = k" by auto
-    moreover from Suc have "Suc j < length seq" using `i < length seq` by simp
-    moreover have "0 < Suc j" by simp
-    ultimately have "snd(seq!(Suc j - 1))!m = k \<or> (snd(seq!(Suc j - 1))!m = k - 1 \<and> findFreeMan (fst(seq!(Suc j - 1))) = Some m)" using GS'_arg_seq_prev_prop_idx_same_or_1_less seq `k > 0` by metis
-    moreover have "Suc j - 1 < i" using Suc by simp
-    ultimately have "snd(seq!(Suc j - 1))!m = k" using asm by blast
-    thus ?case by simp
+    from Suc.hyps(2) have "Suc j < i" by linarith
+    moreover from Suc.hyps(2) have "d = i - 1 - Suc j" by auto
+    moreover obtain X' Y' where seq_Suc_j:"seq!Suc j = (X', Y')" by fastforce
+    ultimately have "Y'!m = k" using Suc.hyps(1) by blast
+    moreover from `Suc j < i` assms(2) have "Suc j < length seq" by auto
+    ultimately have "Y_prev!m = k \<or> (Y_prev!m = k_1 \<and> findFreeMan X_prev = Some m)" using GS'_arg_seq_prev_prop_idx_same_or_1_less seq seq_Suc_j Suc.prems(2) k_1 by blast
+    with asm Suc.prems show ?case by blast
   qed
-  hence "snd(seq!0)!m = k" using `0 < i` by simp
-  hence "(replicate N 0)!m = k" using seq by (simp del:GS'_arg_seq.simps)
-  thus False using `k > 0` `m < N` by simp
+  moreover have "0 < i \<and> seq!0 = (engagements, replicate N 0)" using i_1 seq by (simp del:GS'_arg_seq.simps)
+  ultimately have "(replicate N 0)!m = k" by blast
+  thus False using k_1 `m < N` by simp
 qed
 
 lemma GS'_arg_seq_all_prev_prop_idxs_exist: "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements (replicate N 0); i < length seq; seq!i = (X, prop_idxs); m < N; prop_idxs!m = k; prop_idx < k\<rbrakk> \<Longrightarrow> \<exists>j < i. snd(seq!j)!m = prop_idx \<and> findFreeMan (fst(seq!j)) = Some m"
