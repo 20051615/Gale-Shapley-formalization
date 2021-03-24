@@ -8,6 +8,7 @@ do
 -unify gs'-arg-seq to all use index form
 -remove unnecessary uses of ?seq eg where they are only used in `seq=?seq`
 -replace all instances of seq!i=(X,Y) with fst(seq!i) snd(seq!i)
+	actually no, on second thought, why dont I instead use X,Y everywhere? in the statement of lemmas too. change all fst(seq!i) (snd(seq!i) TO XY?
 -organize using <sections> functionality
 -eventually: remove unused lemmas
 -a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
