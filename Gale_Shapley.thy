@@ -1064,6 +1064,66 @@ proof -
   with findFreeMan_None show ?thesis by auto
 qed
 
+lemma GS'_arg_seq_prop_idx_bound:
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+      and "is_valid_pref_matrix N MPrefs"
+      and "i < length seq" and "seq!i = (engagements, prop_idxs)" and "m < N"
+    shows "prop_idxs!m \<le> N"
+proof (rule ccontr)
+  assume "\<not>prop_idxs!m \<le> N"
+  then obtain k where "prop_idxs!m = k" and "N < k" by simp
+  from GS'_arg_seq_all_prev_prop_idxs_exist[OF seq assms(3-5) this] obtain j X_prev Y_prev where
+    j:"j < i \<and> seq!j = (X_prev, Y_prev) \<and> Y_prev!m = N \<and> findFreeMan X_prev = Some m" by blast
+  hence "j < length seq" using assms(3) by linarith
+  from GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2) this _ `m<N`] j
+  show False by simp
+qed
+
+lemma GS'_arg_seq_prop_idx_bound_non_terminal:
+  assumes "seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+      and "is_valid_pref_matrix N MPrefs"
+      and "i < length seq" and "seq!i = (engagements, prop_idxs)"
+      and "m < N" and "\<not>is_terminal N engagements prop_idxs"
+    shows "prop_idxs!m < N"
+proof (rule ccontr)
+  assume "\<not>prop_idxs!m < N"
+  with GS'_arg_seq_prop_idx_bound[OF assms(1-5)]
+  have "prop_idxs!m = N" by linarith
+  with GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-5)] assms(6)
+  show False by blast
+qed
+
+lemma GS'_arg_seq_N_imp_prev_bump:
+  assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+      and "is_valid_pref_matrix N MPrefs" and "N = Suc N_1"
+      and "i < length seq" and seq_i:"seq!i = (engagements, prop_idxs)"
+      and "m < N" and "prop_idxs!m = N"
+    shows "\<exists>i_1 X_prev Y_prev. i = Suc i_1 \<and> seq!i_1 = (X_prev, Y_prev) \<and> Y_prev!m = N_1 \<and> findFreeMan X_prev = Some m"
+proof -
+  have "i \<noteq> 0"
+  proof
+    assume "i = 0"
+    with seq seq_i assms(7) have "(replicate N 0)!m = N" by (simp del:GS'_arg_seq.simps)
+    with `m<N` show False by fastforce
+  qed
+  then obtain i_1 where i_1:"i = Suc i_1" using not0_implies_Suc by blast
+  from i_1 assms(4) have i_1_bound:"i_1 < length seq" by linarith
+  obtain X_prev Y_prev where seq_i_1:"seq!i_1 = (X_prev, Y_prev)" by fastforce
+  obtain N_1 where N_1:"N = Suc N_1" using `m<N` by (metis Nat.lessE)
+
+  from GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2) assms(4-7)]
+  have "is_terminal N engagements prop_idxs" by blast
+  with GS'_arg_seq_last_eq_terminal[OF seq assms(3-4)] 
+  have last:"i = length seq - 1" by meson
+  have "Y_prev!m \<noteq> N"
+  proof
+    assume "Y_prev!m = N"
+    from GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2) i_1_bound seq_i_1 `m<N` this]
+      GS'_arg_seq_last_eq_terminal[OF seq i_1_bound seq_i_1] last i_1
+    show False by simp
+  qed
+  with GS'_arg_seq_prev_prop_idx_same_or_1_less[OF seq _ _ seq_i_1 N_1 assms(6)] i_1 assms(3-4)
+
 theorem GS'_arg_seq_never_reaches_NxN:
   assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
       and "is_valid_pref_matrix N MPrefs" and "N \<ge> 2"
@@ -1084,25 +1144,15 @@ proof (rule ccontr)
     hence "sum_list prop_idxs \<le> N * N - N" by (simp add: diff_mult_distrib2)
     thus False using asm `N\<ge>2` using le_add_diff_inverse2 by fastforce
   qed
-  then obtain m k where m_k:"m < N \<and> prop_idxs!m = k \<and> k \<ge> N" by blast
-  moreover have less_eq_N:"\<lbrakk>m < N; prop_idxs!m = k\<rbrakk> \<Longrightarrow> k \<le> N" for m k
-  proof (rule ccontr)
-    assume "\<not> k \<le> N"
-    hence "N < k" by linarith
-    moreover assume "m < N" and k:"prop_idxs!m = k"
-    ultimately obtain j X_prev Y_prev where "j < i \<and> seq!j = (X_prev, Y_prev) \<and> Y_prev!m = N \<and> findFreeMan X_prev = Some m" using GS'_arg_seq_all_prev_prop_idxs_exist[OF seq assms(4-5)] by blast
-    moreover with assms(4) have "j < length seq" by linarith
-    ultimately show False using GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2)] `m<N` by force
-  qed
-  ultimately have "k = N" by fastforce
-  hence "findFreeMan engagements = None" using GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2) assms(4-5)] m_k by auto
-  hence "is_terminal N engagements prop_idxs" by simp
-  hence "i = length seq - 1" using GS'_arg_seq_last_eq_terminal[OF seq assms(4-5)] by argo
-
+  then obtain m where "m < N \<and> prop_idxs!m \<ge> N" by blast
+  with GS'_arg_seq_prop_idx_bound[OF assms(1-2) assms(4-5)]
+  have m:"m < N \<and> prop_idxs!m = N" by fastforce
+  hence terminal:"is_terminal N engagements prop_idxs" using GS'_arg_seq_prop_idx_bound_non_terminal[OF assms(1-2) assms(4-5)] by auto
+(* dedupe this against lemma prev is bump above *)
   have "i \<noteq> 0"
   proof
     assume "i = 0"
-    with assms(5) seq m_k `N\<ge>2` show False by (auto simp del:GS'_arg_seq.simps)
+    with assms(5) seq m `N\<ge>2` show False by (auto simp del:GS'_arg_seq.simps)
   qed
   then obtain i_1 where i_1:"i = Suc i_1" using not0_implies_Suc by blast
   hence i_1_bound:"i_1 < length seq" using assms(4) by linarith
@@ -1153,21 +1203,20 @@ proof -
   let ?seq = "GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
   let ?i = "length ?seq - 1"
   from GS'_arg_seq_length_gr_0 have i_bound:"?i < length ?seq" using diff_less zero_less_one by blast
-  moreover obtain X Y where X_Y:"?seq!?i = (X, Y)" by fastforce
-  ultimately have "is_terminal N X Y" using GS'_arg_seq_last_eq_terminal by presburger
+  obtain X Y where X_Y:"?seq!?i = (X, Y)" by fastforce 
+  have "is_terminal N X Y" using GS'_arg_seq_last_eq_terminal[OF _ i_bound X_Y] by metis
   moreover have "length X = length Y"
   proof -
-    have "length X = length (replicate N (None::woman option))" using GS'_arg_seq_length_fst i_bound X_Y by fast
+    have "length X = length (replicate N (None::woman option))" using GS'_arg_seq_length_fst[OF _ i_bound X_Y] by fast
     also have "... = length (replicate N (0::nat))" by simp
-    also have "... = length Y" using GS'_arg_seq_length_snd i_bound X_Y by metis
+    also have "... = length Y" using GS'_arg_seq_length_snd[OF _ i_bound X_Y] by presburger
     finally show ?thesis .
   qed
-  moreover have "sum_list Y < N * N" using GS'_arg_seq_never_reaches_NxN assms(2-3) i_bound X_Y by blast
+  moreover have "sum_list Y < N * N" using GS'_arg_seq_never_reaches_NxN[OF _ assms(2-3) i_bound X_Y] by fast
   moreover have "result = X"
   proof -
-    from assms(2) length_PPrefs have "length MPrefs = N" by blast
-    hence "result = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" using assms(1) by (simp add:Let_def)
-    also have "... = X" using GS'_arg_seq_computes_GS' X_Y by blast
+    have "result = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" using assms(1) length_PPrefs[OF assms(2)] by simp
+    also have "... = X" using GS'_arg_seq_computes_GS'[OF _ X_Y] by fast
     finally show ?thesis .
   qed
   ultimately have "findFreeMan result = None" by simp
@@ -1175,27 +1224,18 @@ proof -
 qed
 
 lemma GS'_arg_seq_all_bounded:"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0); is_valid_pref_matrix N MPrefs; i < length seq; seq!i = (engagements, prop_idxs)\<rbrakk> \<Longrightarrow> is_bounded engagements"
-proof (induction i)
+proof (induction i arbitrary:engagements prop_idxs)
   case 0
   hence "engagements = (replicate N None)" by (simp del:GS'_arg_seq.simps)
   thus ?case by simp
 next
   case (Suc i)
-  have seq_i: "seq!i = (fst(seq!i), snd(seq!i))" by simp
-  moreover have i_bound: "i < length seq" using Suc.prems(3) by simp
-  ultimately have in_set:"(fst(seq!i), snd(seq!i)) \<in> set seq" by (metis in_set_conv_nth)
-  show ?case
-  proof cases
-    assume "is_terminal N (fst(seq!i)) (snd(seq!i))"
-    hence "length seq = Suc i" using GS'_arg_seq_terminal_is_last Suc.prems(1) seq_i i_bound by metis
-    with Suc.prems(3) have False by simp
-    thus ?case by simp
-  next
-    assume non_terminal:"\<not> is_terminal N (fst(seq!i)) (snd(seq!i))"
-    then obtain m where m:"findFreeMan (fst(seq!i)) = Some m" by auto
-    let ?w = "MPrefs!m!((snd(seq!i))!m)"
-    let ?next_prop_idxs = "(snd(seq!i))[m:=Suc((snd(seq!i))!m)]"
-    from i_bound Suc.prems(1-2) Suc.IH have IH:"is_bounded (fst(seq!i))" by metis
+  obtain X_prev Y_prev where X_Y:"seq!i = (X_prev, Y_prev)" by fastforce
+  from Suc.prems(3) have i_bound:"i < length seq" and "i \<noteq> length seq - 1" by simp_all
+  hence non_terminal:"\<not>is_terminal N X_prev Y_prev" using GS'_arg_seq_last_eq_terminal[OF Suc.prems(1) i_bound X_Y] by meson
+  then obtain m where m:"findFreeMan X_prev = Some m" by blast
+  thm Suc.IH[OF Suc.prems(1-2) i_bound X_Y]
+  let ?w = "MPrefs!m!(Y_prev!m)"
 
     from GS'_arg_seq_preserves_length in_set Suc.prems(1) have length:"length (fst(seq!i)) = N \<and> length (snd(seq!i)) = N" by (metis length_replicate)
     with m findFreeMan_bound have "m < N" by metis
