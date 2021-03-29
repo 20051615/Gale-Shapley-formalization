@@ -40,8 +40,8 @@ next
     with Cons.prems show ?case by simp
   next
     assume "term \<noteq> x"
-    moreover with Cons.prems obtain idx' where "find_idx term xs = Some idx'" by force
-    ultimately show ?case using Cons by force
+    moreover with Cons.prems obtain idx' where idx':"find_idx term xs = Some idx'" by fastforce
+    ultimately show ?case using Cons.IH[OF idx'] Cons.prems by simp
   qed
 qed
 
@@ -55,7 +55,7 @@ next
   show "term \<in> set xs \<Longrightarrow> find_idx term xs \<noteq> None"
     apply (induction xs)
      apply simp
-    by force
+    by fastforce
 qed
 
 lemma find_idx_None:"find_idx term xs = None \<longleftrightarrow> term \<notin> set xs" using find_idx_Some by metis 
@@ -72,17 +72,17 @@ next
     thus ?case using Cons.prems by simp
   next
     assume "term \<noteq> x"
-    moreover with Cons.prems(1) obtain idx_1 where idx_1:"find_idx term xs = Some idx_1" by fastforce
-    ultimately have "idx = Suc idx_1" using Cons.prems(1) by fastforce
+    moreover with Cons.prems(1) obtain idx_1
+      where idx_1:"find_idx term xs = Some idx_1" by fastforce
+    ultimately have idx:"idx = Suc idx_1" using Cons.prems(1) by simp
     show ?case
     proof (cases idx')
       case 0
       with `term \<noteq> x` show ?thesis by simp
     next
       case (Suc idx'_1)
-      with Cons.prems(2) `idx = Suc idx_1` have "idx'_1 < idx_1" by simp
-      with Cons.IH idx_1 have "xs!idx'_1 \<noteq> term" by simp
-      with Suc show ?thesis by simp
+      with Cons.prems(2) idx have "idx'_1 < idx_1" by simp
+      from Cons.IH[OF idx_1 this] Suc show ?thesis by simp
     qed
   qed
 qed
@@ -96,7 +96,7 @@ next
   show ?case
   proof (cases idx)
     case 0
-    with Cons.prems(3) show ?thesis by force
+    with Cons.prems(3) show ?thesis by simp
   next
     case (Suc idx_1)
     thus ?thesis using Cons by fastforce
@@ -118,25 +118,37 @@ next
     with Cons.prems have prem:"term \<in> set xs" by auto
     with find_idx_Some have "find_idx term xs \<noteq> None" by metis
     then obtain idx where idx:"find_idx term xs = Some idx" by blast
-    hence "xs!idx = term" using Cons.IH prem by simp
+    hence "xs!idx = term" using Cons.IH[OF prem] by simp
     with idx `term \<noteq> x` show ?case by simp
   qed
 qed
 
 fun findFreeMan::"matching \<Rightarrow> man option" where
 "findFreeMan engagements = find_idx None engagements"
-lemma findFreeMan_bound:"findFreeMan engagements = Some m \<Longrightarrow> m < length engagements" using find_idx_bound by simp
-lemma findFreeMan_None:"findFreeMan engagements = None \<longleftrightarrow> None \<notin> set engagements" using find_idx_None by fastforce
-lemma findFreeMan:"findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None" using find_idx find_idx_Some by fastforce
+lemma findFreeMan_bound:"findFreeMan engagements = Some m \<Longrightarrow> m < length engagements"
+  using find_idx_bound by simp
+lemma findFreeMan_None:"findFreeMan engagements = None \<longleftrightarrow> None \<notin> set engagements"
+  using find_idx_None by fastforce
+lemma findFreeMan:"findFreeMan engagements = Some m \<Longrightarrow> engagements!m = None"
+  using find_idx find_idx_Some by fastforce
 
 fun findFiance::"matching \<Rightarrow> woman \<Rightarrow> man option" where
 "findFiance engagements w = find_idx (Some w) engagements"
-lemma findFiance_bound:"findFiance engagements w = Some m \<Longrightarrow> m < length engagements" using find_idx_bound by simp
-lemma findFiance_Some:"findFiance engagements w \<noteq> None \<longleftrightarrow> Some w \<in> set engagements" using find_idx_Some by fastforce
-lemma findFiance_None:"findFiance engagements w = None \<longleftrightarrow> Some w \<notin> set engagements" using findFiance_Some by blast
-lemma findFiance_Some_is_first:"\<lbrakk>findFiance engagements w = Some m; m' < m\<rbrakk> \<Longrightarrow> engagements!m' \<noteq> Some w" using find_idx_Some_is_first by fastforce
-lemma findFiance_first_is_Some:"\<lbrakk>m < length engagements; \<forall>m'<m. engagements!m'\<noteq>Some w; engagements!m = Some w\<rbrakk> \<Longrightarrow> findFiance engagements w = Some m" using find_idx_first_is_Some by force
-lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagements!m = Some w" using find_idx find_idx_Some by fastforce
+lemma findFiance_bound:"findFiance engagements w = Some m \<Longrightarrow> m < length engagements" 
+  using find_idx_bound by simp
+lemma findFiance_Some:"findFiance engagements w \<noteq> None \<longleftrightarrow> Some w \<in> set engagements"
+  using find_idx_Some by fastforce
+lemma findFiance_None:"findFiance engagements w = None \<longleftrightarrow> Some w \<notin> set engagements"
+  using findFiance_Some by blast
+lemma findFiance_Some_is_first:
+"\<lbrakk>findFiance engagements w = Some m; m' < m\<rbrakk> \<Longrightarrow> engagements!m' \<noteq> Some w" 
+  using find_idx_Some_is_first by fastforce
+lemma findFiance_first_is_Some:
+"\<lbrakk>m < length engagements; \<forall>m'<m. engagements!m'\<noteq>Some w; engagements!m = Some w\<rbrakk>
+   \<Longrightarrow> findFiance engagements w = Some m"
+  using find_idx_first_is_Some by force
+lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagements!m = Some w" 
+  using find_idx find_idx_Some by fastforce
 
 fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
 "findPerson ps p = find_idx p ps"
