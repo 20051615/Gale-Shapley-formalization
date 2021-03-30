@@ -14,13 +14,11 @@ lemma in_perm_upt: "x < k \<longleftrightarrow> (\<exists>A. A <~~> [0 ..< k] \<
 fun is_perm::"'a list \<Rightarrow> 'a list \<Rightarrow> bool" where "is_perm A B = (mset A = mset B)"
 lemma is_perm:"is_perm A B \<longleftrightarrow> A <~~> B" using mset_eq_perm by auto
 fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" where
-"is_valid_pref_matrix N PPrefs = (if length PPrefs \<noteq> N then False 
-                            else Ball (set PPrefs) (is_perm [0 ..< N]))"
+"is_valid_pref_matrix N PPrefs = (length PPrefs = N \<and> Ball (set PPrefs) (is_perm [0 ..< N]))"
 value "is_valid_pref_matrix 2 [[0, 1],[1, 0]]"
-lemma length_PPrefs:"is_valid_pref_matrix N PPrefs \<Longrightarrow> length PPrefs = N"
-  by (metis is_valid_pref_matrix.simps)
-lemma perm_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; m < N\<rbrakk> \<Longrightarrow> PPrefs!m <~~> [0 ..< N]"
-  by (metis is_valid_pref_matrix.simps nth_mem is_perm perm_sym)
+lemma length_PPrefs:"is_valid_pref_matrix N PPrefs \<Longrightarrow> length PPrefs = N" by simp
+lemma perm_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; m < N\<rbrakk> \<Longrightarrow> PPrefs!m <~~> [0 ..< N]" 
+  using is_perm nth_mem by fastforce
 
 fun find_idx::"'a \<Rightarrow> 'a list \<Rightarrow> nat option" where
 "find_idx _ [] = None" |
@@ -776,28 +774,17 @@ qed
 fun married_better::"woman \<Rightarrow> pref_matrix \<Rightarrow> matching \<Rightarrow> matching \<Rightarrow> bool" where
 "married_better w WPrefs eng_1 eng_2 = (case findFiance eng_1 w of None \<Rightarrow> True | Some m_1 \<Rightarrow> (
                                           case findFiance eng_2 w of None \<Rightarrow> False | Some m_2 \<Rightarrow> (
-                                            if m_1 = m_2 then True
-                                                         else prefers w WPrefs m_2 m_1)))"
+                                            m_1 = m_2 \<or> prefers w WPrefs m_2 m_1)))"
 
 lemma married_better_refl: "married_better w WPrefs eng eng"
   apply (cases "findFiance eng w")
   by simp_all
 
-lemma married_better_imp:
-  assumes "findFiance eng_1 w = Some m_1" and "married_better w WPrefs eng_1 eng_2"
-  shows "\<exists>m_2. (findFiance eng_2 w = Some m_2 \<and> (m_1 = m_2 \<or> prefers w WPrefs m_2 m_1))"
-proof -
-  from assms obtain m_2 where m_2:"findFiance eng_2 w = Some m_2" by fastforce
-  have "findFiance eng_2 w = Some m_2 \<and> (m_1 = m_2 \<or> prefers w WPrefs m_2 m_1)"
-  proof cases
-    assume "m_1 = m_2"
-    with m_2 show ?thesis by blast
-  next
-    assume "m_1 \<noteq> m_2"
-    with assms m_2 show ?thesis by fastforce 
-  qed
-  thus ?thesis by blast
-qed
+lemma married_better_imp:"\<lbrakk>findFiance eng_1 w = Some m_1; married_better w WPrefs eng_1 eng_2\<rbrakk> 
+                            \<Longrightarrow> \<exists>m_2. findFiance eng_2 w = Some m_2 
+                                    \<and> (m_1 = m_2 \<or> prefers w WPrefs m_2 m_1)"
+  apply (cases "findFiance eng_2 w")
+  by simp_all
 
 lemma married_better_trans:
   assumes 12:"married_better w WPrefs eng_1 eng_2" and 23:"married_better w WPrefs eng_2 eng_3"
@@ -807,25 +794,21 @@ proof (cases "findFiance eng_1 w")
   thus ?thesis by simp
 next
   case (Some m_1)
-  then obtain m_2 where m_2:"findFiance eng_2 w = Some m_2" using 12 by force
-  then obtain m_3 where m_3:"findFiance eng_3 w = Some m_3" using 23 by force
-  with m_2 23 married_better_imp have imp_23:"m_2 = m_3 \<or> prefers w WPrefs m_3 m_2" by fastforce
-  from Some m_2 12 married_better_imp have "m_1 = m_2 \<or> prefers w WPrefs m_2 m_1" by fastforce
-  thus ?thesis
+  from married_better_imp[OF this 12] obtain m_2
+    where m_2:"findFiance eng_2 w = Some m_2" 
+      and 12:"m_1 = m_2 \<or> prefers w WPrefs m_2 m_1" by blast
+  from married_better_imp[OF m_2 23] obtain m_3
+    where m_3:"findFiance eng_3 w = Some m_3"
+      and 23:"m_2 = m_3 \<or> prefers w WPrefs m_3 m_2" by blast
+  from 12 show ?thesis
   proof
     assume "m_1 = m_2"
-    with imp_23 show ?thesis using Some m_3 by auto
+    with 23 show ?thesis using Some m_3 by simp
   next
-    assume imp_12:"prefers w WPrefs m_2 m_1"
-    from imp_23 show ?thesis
-    proof
-      assume "m_2 = m_3"
-      thus ?thesis using imp_12 Some m_3 by fastforce
-    next
-      assume "prefers w WPrefs m_3 m_2"
-      with imp_12 prefers_trans have "prefers w WPrefs m_3 m_1" by blast
-      with Some m_3 show ?thesis by fastforce
-    qed
+    assume 12:"prefers w WPrefs m_2 m_1"
+    from 23 show ?thesis
+      apply (rule)
+      using Some m_3 12 prefers_trans[OF _ 12] by (simp_all)
   qed
 qed
 
