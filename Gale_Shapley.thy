@@ -814,212 +814,85 @@ next
   from Suc.hyps(1)[OF this(1) Suc.prems(1-4) Suc_lessD[OF j_bound] seq_j_1 this(2)] 
   have "married_better w WPrefs X_pre X_po_prev" by auto
   moreover have "married_better w WPrefs X_po_prev X_post"
-  proof (cases "findFiance X_po_prev ?w")
+  proof (cases "findFiance X_po_prev w")
     case None
-    from GS'_arg_seq_step_1[OF Suc.prems(1) j_bound seq_j_1 m refl None] Suc.prems(6) j_1
-    have "X_post = X_po_prev[m:=Some ?w]" by auto
-    moreover have "married_better w WPrefs X_po_prev (X_po_prev[m:=Some ?w])"
-    proof cases
-      assume "w = ?w"
-      moreover from None have "married_better ?w WPrefs X_po_prev (X_po_prev[m:=Some ?w])" by simp
-      ultimately show ?thesis by simp
-    next
-      assume "w \<noteq> ?w"
-      show ?thesis
-      proof (cases "findFiance X_po_prev w")
-        case None
-        thus ?thesis by simp
-      next
-        case (Some m_w)
-        from findFreeMan[OF m] findFiance[OF Some] have "m \<noteq> m_w" by auto
-        hence "X_po_prev[m:=Some ?w]!m_w = Some w" using findFiance[OF Some] by simp
-        moreover from findFiance_bound[OF Some] have "m_w < length (X_po_prev[m:=Some ?w])" by simp
-        moreover from findFiance_Some_is_first[OF Some] findFreeMan_bound[OF m] `w \<noteq> ?w`
-        have "\<forall>m'<m_w. (X_po_prev[m:=Some ?w])!m' \<noteq> Some w" by (metis nth_list_update option.inject)
-        ultimately have "findFiance (X_po_prev[m:=Some ?w]) w = Some m_w" 
-          using findFiance_first_is_Some by blast
-        with Some show ?thesis by simp
-      qed
-    qed
-    ultimately show ?thesis by blast
+    thus ?thesis by simp
   next
-
-
-
-
-
-
-
-proof (induction N MPrefs WPrefs engagements prop_idxs arbitrary:seq i j X_pre Y_pre rule:GS'_arg_seq.induct)
-  case (1 N MPrefs WPrefs engagements prop_idxs)
-  show ?case
-  proof cases
-    assume "is_terminal N engagements prop_idxs"
-    with "1.prems" have "length seq = 1" by auto
-    with "1.prems"(3-6) married_better_refl show ?case by auto
-  next
-    assume non_terminal:"\<not> is_terminal N engagements prop_idxs"
-    then obtain m where m:"findFreeMan engagements = Some m" by auto
-    from non_terminal "1.prems"(1) have l_seq:"1 < length seq" using GS'_arg_seq_length_gr_1 by presburger
-    let ?w = "MPrefs!m!(prop_idxs!m)"
-    let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
-    show ?case
-    proof (cases "findFiance engagements ?w")
+    fix m_w
+    assume m_w:"findFiance X_po_prev w = Some m_w"
+    from findFreeMan[OF m] findFiance[OF m_w] have "m \<noteq> m_w" by fastforce
+    show ?thesis
+    proof (cases "findFiance X_po_prev ?w")
       case None
-      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
-      from None "1.prems"(1) have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
-      have "seq!1 = (engagements[m:=Some ?w], ?next_prop_idxs)" using seq_tl by (simp del:GS'_arg_seq.simps)
-      hence distinct:"is_distinct (engagements[m:=Some ?w])" using GS'_arg_seq_all_distinct "1.prems"(1-2) l_seq by blast
-      show ?thesis
-      proof (cases i)
-        case (Suc i_1)
-        with `i\<le>j` obtain j_1 where j_1:"j = Suc j_1" using Suc_le_D by auto
-        from Suc seq_tl "1.prems"(3-4) have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X_pre, Y_pre)" by auto
-        moreover from j_1 seq_tl "1.prems"(5-6) have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-        moreover from "1.prems"(7) Suc j_1 have "i_1 \<le> j_1" by fastforce
-        ultimately show ?thesis using "1.IH"(1) non_terminal m None distinct by blast
-      next
-        case 0
-        show ?thesis
-        proof (cases j)
-          case 0
-          thus ?thesis using married_better_refl `i=0` "1.prems"(4-6) by simp
-        next
-          case (Suc j_1)
-          have "0 \<le> j_1" by fast
-          moreover from Suc "1.prems"(5-6) seq_tl have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-          moreover from GS'_arg_seq_length_gr_0 have "0 < length ?seq_tl" by fast
-          moreover have "?seq_tl!0 = (engagements[m:=Some ?w], ?next_prop_idxs)" by (simp del:GS'_arg_seq.simps)
-          ultimately have "married_better w WPrefs (engagements[m:=Some ?w]) X_post" using "1.IH"(1) non_terminal m None distinct by blast
-          moreover have "married_better w WPrefs engagements (engagements[m:=Some ?w])"
-          proof cases
-            assume "w = ?w"
-            moreover from None have "married_better ?w WPrefs engagements (engagements [m:=Some ?w])" by simp
-            ultimately show ?thesis by simp
-          next
-            assume "w \<noteq> ?w"
-            show ?thesis
-            proof (cases "findFiance engagements w")
-              case None
-              thus ?thesis by simp
-            next
-              case (Some m_w)
-              hence "\<forall>m'<m_w. engagements!m' \<noteq> Some w" using findFiance_Some_is_first by auto
-              hence false_front:"\<forall>m'<m_w. (engagements[m:=Some ?w])!m' \<noteq> Some w" using `w \<noteq> ?w` by (metis findFreeMan_bound m nth_list_update option.inject)
-              from Some findFiance have Some_idx:"engagements!m_w = Some w" by simp
-              moreover from m findFreeMan have "engagements!m = None" by simp
-              ultimately have "m \<noteq> m_w" by auto
-              hence "engagements[m:=Some ?w]!m_w = Some w" using Some_idx by simp
-              moreover from Some findFiance_bound have "m_w < length (engagements[m:=Some ?w])" by simp
-              ultimately have "findFiance (engagements[m:=Some ?w]) w = Some m_w" using findFiance_first_is_Some false_front by simp
-              with Some show ?thesis by simp
-            qed
-          qed
-          moreover have "X_pre = engagements" using "1.prems"(1) "1.prems"(4) `i=0` by (simp del:GS'_arg_seq.simps)
-          ultimately show ?thesis using married_better_trans by blast
-        qed
+      have "m_w < length (X_po_prev[m:=Some ?w])" using findFiance_bound[OF m_w] by simp
+      moreover have "\<forall>m'<m_w. (X_po_prev[m:=Some ?w])!m' \<noteq> Some w"
+      proof -
+        from m_w None have "Some ?w \<noteq> Some w" by auto
+        with findFreeMan_bound[OF m] findFiance_Some_is_first[OF m_w]
+        show ?thesis by (metis nth_list_update)
       qed
+      moreover have "X_po_prev[m:=Some ?w]!m_w = Some w" using `m\<noteq>m_w` findFiance[OF m_w] by simp
+      ultimately have "findFiance (X_po_prev[m:=Some ?w]) w = Some m_w" 
+        using findFiance_first_is_Some by blast
+      moreover have "X_post = (X_po_prev[m:=Some ?w])" 
+        using GS'_arg_seq_step_1[OF Suc.prems(1) j_bound seq_j_1 m refl None] 
+          Suc.prems(6) j_1 by auto
+      ultimately have "findFiance X_post w = Some m_w" by blast
+      with m_w show ?thesis by simp
     next
       case (Some m')
-      with findFiance have "engagements!m' = Some ?w" by simp
-      moreover from m findFreeMan have "engagements!m = None" by simp
-      ultimately have "m' \<noteq> m" by auto
       show ?thesis
-      proof cases
-        assume change:"prefers ?w WPrefs m m'"
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
-        from Some change "1.prems"(1) have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
-        hence "seq!1 = (engagements[m:=Some ?w, m':=None], ?next_prop_idxs)" by (simp del:GS'_arg_seq.simps)
-        with seq_tl have distinct:"is_distinct (engagements[m:=Some ?w, m':=None])" using GS'_arg_seq_all_distinct "1.prems"(1-2) l_seq by blast
-        show ?thesis
-        proof (cases i)
-          case (Suc i_1)
-          with `i\<le>j` obtain j_1 where j_1:"j = Suc j_1" using Suc_le_D by auto
-          from Suc seq_tl "1.prems"(3-4) have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X_pre, Y_pre)" by auto
-          moreover from j_1 seq_tl "1.prems"(5-6) have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-          moreover from "1.prems"(7) Suc j_1 have "i_1 \<le> j_1" by fastforce
-          ultimately show ?thesis using "1.IH"(2) non_terminal m Some change distinct by blast
-        next
-          case 0
+      proof (cases "prefers ?w WPrefs m m'")
+        case True
+        have "married_better w WPrefs X_po_prev (X_po_prev[m:=Some ?w, m':=None])"
+        proof -
+          from GS'_arg_seq_all_distinct[OF Suc.prems(1-2) Suc_lessD[OF j_bound] seq_j_1]
+          have distinct:"is_distinct X_po_prev" .
           show ?thesis
-          proof (cases j)
-            case 0
-            thus ?thesis using married_better_refl `i=0` "1.prems"(4-6) by simp
+          proof cases
+            assume "w = ?w"
+            from findFiance[OF Some] findFreeMan[OF m] have "m' \<noteq> m" by fastforce
+            from `w = ?w` findFiance[OF Some] 
+            have "X_po_prev!m' = Some w" and "X_po_prev!m' \<noteq> None" by simp_all
+            hence "\<forall>m''. (m'' \<noteq> m' \<and> m'' < length X_po_prev) \<longrightarrow> X_po_prev!m'' \<noteq> Some w" 
+              using distinct findFiance_bound[OF Some] by metis
+            hence "\<forall>m''. m'' < length X_po_prev \<longrightarrow> X_po_prev[m':=None]!m'' \<noteq> Some w" 
+              using findFiance_bound[OF Some] by (simp add: nth_list_update)
+            hence "\<forall>m''. (m''\<noteq>m \<and> m'' < length X_po_prev) 
+                      \<longrightarrow> X_po_prev[m':=None, m:=Some ?w]!m'' \<noteq> Some w" by simp
+            hence "\<forall>m''. (m''\<noteq>m \<and> m'' < length X_po_prev) 
+                      \<longrightarrow> X_po_prev[m:=Some ?w, m':=None]!m'' \<noteq> Some w" 
+              using `m'\<noteq>m` by (metis list_update_swap)
+            hence "\<forall>m''. m'' < m \<longrightarrow> X_po_prev[m:=Some ?w, m':=None]!m'' \<noteq> Some w" 
+              using findFreeMan_bound[OF m] by simp
+            moreover have "(X_po_prev[m:=Some ?w, m':=None])!m = Some w"
+              using `w = ?w` `m' \<noteq> m` findFreeMan_bound[OF m] by auto
+            ultimately have "findFiance (X_po_prev[m:=Some ?w, m':=None]) w = Some m"
+              using findFreeMan_bound[OF m] findFiance_first_is_Some by simp
+            with `w = ?w` Some True `m'\<noteq>m` show ?thesis by simp
           next
-            case (Suc j_1)
-            have "0 \<le> j_1" by fast
-            moreover from Suc "1.prems"(5-6) seq_tl have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-            moreover from GS'_arg_seq_length_gr_0 have "0 < length ?seq_tl" by fast
-            moreover have "?seq_tl!0 = (engagements[m:=Some ?w, m':=None], ?next_prop_idxs)" by (simp del:GS'_arg_seq.simps)
-            ultimately have "married_better w WPrefs (engagements[m:=Some ?w, m':=None]) X_post" using "1.IH"(2) non_terminal m Some change distinct by blast
-            moreover have "married_better w WPrefs engagements (engagements[m:=Some ?w, m':=None])"
-            proof cases
-              assume "w = ?w"
-              from findFiance_bound have "m' < length engagements" using Some by simp
-              moreover from `w = ?w` `engagements!m' = Some ?w` have "engagements!m' = Some w" by simp
-              ultimately have "\<forall>m''. (m'' \<noteq> m' \<and> m'' < length engagements) \<longrightarrow> engagements!m'' \<noteq> Some w" using "1.prems"(2) by (metis option.discI)
-              with `w = ?w` have "\<forall>m''. (m'' \<noteq> m \<and> m'' < length (engagements[m:=Some ?w, m':=None])) \<longrightarrow> (engagements[m:=Some ?w, m':=None])!m'' \<noteq> Some w" by (metis (full_types) length_list_update nth_list_update nth_list_update_neq option.discI)
-              moreover from findFreeMan_bound m have m_bound:"m < length (engagements[m:=Some ?w, m':=None])" by simp
-              ultimately have "\<forall>m''<m. (engagements[m:=Some ?w, m':=None])!m'' \<noteq> Some w" by simp
-              moreover have "(engagements[m:=Some ?w, m':=None])!m = Some w" using `w = ?w` `m' \<noteq> m` m_bound by auto
-              ultimately have "findFiance (engagements[m:=Some ?w, m':=None]) w = Some m" using m_bound findFiance_first_is_Some by simp
-              moreover from `w = ?w` Some have "findFiance engagements w = Some m'" by simp
-              moreover from `w = ?w` change have "prefers w WPrefs m m'" by simp
-              ultimately show ?thesis using `m' \<noteq> m` by simp
-            next
-              assume "w \<noteq> ?w"
-              show ?thesis
-              proof (cases "findFiance engagements w")
-                case None
-                thus ?thesis by simp
-              next
-                case (Some m_w)
-                hence "engagements!m_w = Some w" and "m_w < length engagements" using findFiance findFiance_bound by auto
-                with `engagements!m = None` `engagements!m' = Some ?w` `w \<noteq> ?w` have "m \<noteq> m_w" and "m' \<noteq> m_w" by auto
-                from "1.prems"(2) `engagements!m_w = Some w` `m_w < length engagements` have "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length engagements) \<longrightarrow> engagements!m'' \<noteq> Some w" by (metis option.discI)
-                hence "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length (engagements[m:=Some ?w, m':=None])) \<longrightarrow> engagements!m'' \<noteq> Some w" by simp
-                hence "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length (engagements[m:=Some ?w, m':=None])) \<longrightarrow> (engagements[m:=Some ?w, m':=None])!m'' \<noteq> Some w" using `w \<noteq> ?w` by (metis (full_types) length_list_update nth_list_update_eq nth_list_update_neq option.discI option.inject)
-                hence "\<forall>m''<m_w. (engagements[m:=Some ?w, m':=None])!m'' \<noteq> Some w" using `m_w < length engagements` by simp
-                moreover from `m' \<noteq> m_w` `m \<noteq> m_w` `m_w < length engagements` `engagements!m_w = Some w` have "(engagements[m:=Some ?w, m':=None])!m_w = Some w" by simp
-                ultimately have "findFiance (engagements[m:=Some ?w, m':=None]) w = Some m_w" using `m_w < length engagements` findFiance_first_is_Some by simp
-                with Some show ?thesis by simp
-              qed
-            qed
-            moreover have "X_pre = engagements" using "1.prems"(1) "1.prems"(4) `i=0` by (simp del:GS'_arg_seq.simps)
-            ultimately show ?thesis using married_better_trans by blast
+            assume "w \<noteq> ?w"
+            with findFiance[OF Some] findFiance[OF m_w] have "m' \<noteq> m_w" by fastforce
+            from distinct findFiance[OF m_w] findFiance_bound[OF m_w] have "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length X_po_prev) \<longrightarrow> X_po_prev!m'' \<noteq> Some w" by (metis option.discI)
+            hence "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length (X_po_prev[m:=Some ?w, m':=None])) \<longrightarrow> X_po_prev!m'' \<noteq> Some w" by simp
+            hence "\<forall>m''.(m''\<noteq>m_w \<and> m'' < length (X_po_prev[m:=Some ?w, m':=None])) \<longrightarrow> (X_po_prev[m:=Some ?w, m':=None])!m'' \<noteq> Some w" using `w \<noteq> ?w` by (metis (full_types) length_list_update nth_list_update_eq nth_list_update_neq option.discI option.inject)
+            hence "\<forall>m''<m_w. (X_po_prev[m:=Some ?w, m':=None])!m'' \<noteq> Some w" using findFiance_bound[OF m_w] by simp
+            moreover from `m' \<noteq> m_w` `m \<noteq> m_w` findFiance_bound[OF m_w] findFiance[OF m_w] have "(X_po_prev[m:=Some ?w, m':=None])!m_w = Some w" by simp
+            ultimately have "findFiance (X_po_prev[m:=Some ?w, m':=None]) w = Some m_w" using findFiance_bound[OF m_w] findFiance_first_is_Some by simp
+            with m_w show ?thesis by simp
           qed
         qed
+        with GS'_arg_seq_step_2[OF Suc.prems(1) j_bound seq_j_1 m refl Some True] Suc.prems(6) j_1
+        show ?thesis by simp
       next
-        assume no_change:"\<not>prefers ?w WPrefs m m'"
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-        from Some no_change "1.prems"(1) have seq_tl:"seq = (engagements, prop_idxs) # ?seq_tl" using non_terminal m by (simp add:Let_def)
-        show ?thesis
-        proof (cases i)
-          case (Suc i_1)
-          with `i\<le>j` obtain j_1 where j_1:"j = Suc j_1" using Suc_le_D by auto
-          from Suc seq_tl "1.prems"(3-4) have "i_1 < length ?seq_tl" and "?seq_tl!i_1 = (X_pre, Y_pre)" by auto
-          moreover from j_1 seq_tl "1.prems"(5-6) have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-          moreover from "1.prems"(7) Suc j_1 have "i_1 \<le> j_1" by fastforce
-          ultimately show ?thesis using "1.IH"(3) non_terminal m Some no_change "1.prems"(2) by blast
-        next
-          case 0
-          show ?thesis
-          proof (cases j)
-            case 0
-            thus ?thesis using `i=0` "1.prems"(4-6) married_better_refl by force
-          next
-            case (Suc j_1)
-            have "0 \<le> j_1" by fast
-            moreover from Suc "1.prems"(5-6) seq_tl have "j_1 < length ?seq_tl" and "?seq_tl!j_1 = (X_post, Y_post)" by auto
-            moreover from GS'_arg_seq_length_gr_0 have "0 < length ?seq_tl" by fast
-            moreover have "?seq_tl!0 = (engagements, ?next_prop_idxs)" by (simp del:GS'_arg_seq.simps)
-            moreover have "X_pre = engagements" using "1.prems"(1) "1.prems"(4) `i=0` by (simp del:GS'_arg_seq.simps)
-            ultimately show ?thesis using "1.IH"(3) non_terminal m Some no_change "1.prems"(2) by blast
-          qed
-        qed
+        case False
+        from GS'_arg_seq_step_3[OF Suc.prems(1) j_bound seq_j_1 m refl Some this] Suc.prems(6) j_1
+        have "X_post = X_po_prev" by simp
+        thus ?thesis using married_better_refl by simp
       qed
     qed
   qed
+  ultimately show ?case using married_better_trans by blast
 qed
 
 lemma GS'_arg_seq_prev_prop_idx_same_or_1_less:
