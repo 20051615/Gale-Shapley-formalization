@@ -1063,7 +1063,7 @@ proof (rule ccontr)
   from GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-5) this] assms(6) 
   show False by blast
 qed
-(* start from here *)
+
 lemma GS'_arg_seq_N_imp_prev_bump:
   assumes "seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
       and "is_valid_pref_matrix N MPrefs"
@@ -1078,17 +1078,19 @@ proof -
     with assms(1,4,6) have "(replicate N 0)!m = N" by (simp del:GS'_arg_seq.simps)
     with `m<N` show False by fastforce
   qed
-  then obtain i_1 where i_1:"i = Suc i_1" using not0_implies_Suc by blast
-  obtain X_prev Y_prev where seq_i_1:"seq!i_1 = (X_prev, Y_prev)" by fastforce
-  obtain N_1 where N_1:"N = Suc N_1" using `m<N` by (metis lessE)
-
-  from GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1-2) Suc_lessD seq_i_1 `m<N`]
-    i_1 assms(3) GS'_arg_seq_last_eq_terminal[OF assms(1) Suc_lessD seq_i_1] 
-  have "Y_prev!m \<noteq> N" by fastforce
-  with GS'_arg_seq_prev_prop_idx_same_or_1_less[OF assms(1) _ _ seq_i_1 N_1 assms(6)] i_1 assms(3-4) N_1 seq_i_1
-  show ?thesis by blast
+  moreover have "N \<noteq> 0" using `m<N` by linarith
+  ultimately obtain i_1 N_1 X_prev Y_prev where i_1:"i = Suc i_1" and N_1:"N = Suc N_1"
+    and seq_i_1:"seq!i_1 = (X_prev, Y_prev)" using not0_implies_Suc by fastforce
+  from i_1 assms(3,4) have "Suc i_1 < length seq" and "seq!Suc i_1 = (engagements, prop_idxs)" 
+    by simp_all
+  from GS'_arg_seq_prev_prop_idx_same_or_1_less[OF assms(1) this seq_i_1 N_1 assms(6)]
+    GS'_arg_seq_any_man_done_proposing_means_done[OF assms(1,2) 
+      Suc_lessD[OF this(1)] seq_i_1 `m<N`] GS'_arg_seq_last_eq_terminal[OF assms(1)
+      Suc_lessD[OF this(1)] seq_i_1] this(1) 
+  have "Y_prev!m = N_1 \<and> findFreeMan X_prev = Some m" by force
+  with i_1 N_1 seq_i_1 show ?thesis by blast
 qed
-
+(*start from here*)
 theorem GS'_arg_seq_never_reaches_NxN:
   assumes seq:"seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
       and "is_valid_pref_matrix N MPrefs" and "N \<ge> 2"
