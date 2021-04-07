@@ -795,6 +795,25 @@ next
   qed
 qed
 
+lemma GS'_arg_seq_findFiance_1:
+  assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" 
+      and "Suc i < length seq" and "seq!i = (X, Y)" and "seq!Suc i = (X_next, Y_next)"
+      and "findFreeMan X = Some m" and "w = MPrefs!m!(Y!m)"
+      and "findFiance X w = None"
+    shows "findFiance X_next w = Some m"
+proof -
+  from findFreeMan_bound[OF assms(5)] have m_bound:"m < length X" .
+
+  from assms(7) findFiance_None have "\<forall>m<length X. X!m \<noteq> Some w" by (metis nth_mem)
+  with m_bound have "\<forall>m'<m. X!m' \<noteq> Some w" by fastforce
+  moreover have "X[m:=Some w]!m = Some w" using m_bound by simp
+  ultimately have "findFiance (X[m:=Some w]) w = Some m" 
+    using findFiance_first_is_Some m_bound by simp
+  with GS'_arg_seq_step_1[OF assms(1-3,5-7)] assms(4) show ?thesis by simp
+qed
+
+lemma GS'_arg_seq_
+
 lemma GS'_arg_seq_all_w_marry_better:
 "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; is_distinct engagements; 
   i < length seq; seq!i = (X_pre, Y_pre); j < length seq; seq!j = (X_post, Y_post);
@@ -962,10 +981,12 @@ qed
 lemma GS'_arg_seq_married_once_proposed_to:
   assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
       and "Suc i < length seq" and "seq!i = (X, Y)" and "seq!Suc i = (X_next, Y_next)"
-      and m:"findFreeMan X = Some m"
-    shows "findFiance X_next (MPrefs!m!(Y!m)) \<noteq> None"
-proof -
-  let ?w = "MPrefs!m!(Y!m)"
+      and m:"findFreeMan X = Some m" and "w = MPrefs!m!(Y!m)"
+    shows "\<exists>m'. findFiance X_next w = Some m' \<and> (m' = m \<or> prefers w WPrefs m' m)"
+proof (cases "findFiance X w")
+  case None
+  from GS'_arg_seq_step_1[OF assms(1-3,5,6) None] assms(4) have "X_next = X[m:=Some w]" by simp
+
   show ?thesis
   proof (cases "findFiance X ?w")
     case None
