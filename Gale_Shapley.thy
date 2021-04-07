@@ -259,56 +259,57 @@ next
 qed
 
 lemma GS'_arg_seq_length_gr_0:
-"length(GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) > 0"
-  using GS'_arg_seq_non_Nil by auto
+"length(GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) > 0" using GS'_arg_seq_non_Nil by auto
 
 lemma GS'_arg_seq_length_gr_1:
-"\<not>is_terminal N engagements prop_idxs \<longleftrightarrow> 
+"\<not>is_terminal N engagements prop_idxs \<longleftrightarrow>
  length(GS'_arg_seq N MPrefs WPrefs engagements prop_idxs) > 1"
-proof
+proof -
   let ?seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
-  show "\<not>is_terminal N engagements prop_idxs \<Longrightarrow> length(?seq) > 1"
-  proof -
-    assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
-    then obtain m where m:"findFreeMan engagements = Some m" by blast
-    let ?w = "MPrefs!m!(prop_idxs!m)"
-    let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
-    show ?thesis
-    proof (cases "findFiance engagements ?w")
-      case None
-      let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
-      from non_terminal m None have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
-      moreover from GS'_arg_seq_length_gr_0 have "length ?seq_tl > 0" by fast
-      ultimately show ?thesis by linarith
-    next
-      case (Some m')
+  show ?thesis
+  proof
+    show "\<not>is_terminal N engagements prop_idxs \<Longrightarrow> length(?seq) > 1"
+    proof -
+      assume non_terminal:"\<not>is_terminal N engagements prop_idxs"
+      then obtain m where m:"findFreeMan engagements = Some m" by blast
+      let ?w = "MPrefs!m!(prop_idxs!m)"
+      let ?next_prop_idxs = "prop_idxs[m:=Suc(prop_idxs!m)]"
       show ?thesis
-      proof (cases "prefers ?w WPrefs m m'")
-        case True
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs
-                                  (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
-        from non_terminal m Some True 
-        have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
+      proof (cases "findFiance engagements ?w")
+        case None
+        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs (engagements[m:=Some ?w]) ?next_prop_idxs"
+        from non_terminal m None have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
         moreover from GS'_arg_seq_length_gr_0 have "length ?seq_tl > 0" by fast
         ultimately show ?thesis by linarith
       next
-        case False
-        let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
-        from non_terminal m Some False
-        have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
-        moreover from GS'_arg_seq_length_gr_0 have "length ?seq_tl > 0" by fast
-        ultimately show ?thesis by linarith
+        case (Some m')
+        show ?thesis
+        proof (cases "prefers ?w WPrefs m m'")
+          case True
+          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs
+                                    (engagements[m:=Some ?w, m':=None]) ?next_prop_idxs"
+          from non_terminal m Some True 
+          have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
+          moreover from GS'_arg_seq_length_gr_0 have "length ?seq_tl > 0" by fast
+          ultimately show ?thesis by linarith
+        next
+          case False
+          let ?seq_tl = "GS'_arg_seq N MPrefs WPrefs engagements ?next_prop_idxs"
+          from non_terminal m Some False
+          have "length ?seq = Suc (length ?seq_tl)" by (simp add:Let_def)
+          moreover from GS'_arg_seq_length_gr_0 have "length ?seq_tl > 0" by fast
+          ultimately show ?thesis by linarith
+        qed
       qed
     qed
-  qed
-next
-  let ?seq = "GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
-  show "length ?seq > 1 \<Longrightarrow> \<not>is_terminal N engagements prop_idxs"
-  proof
-    assume "is_terminal N engagements prop_idxs"
-    hence "length ?seq = 1" by auto
-    moreover assume "length ?seq > 1"
-    ultimately show False by auto
+  next
+    show "length ?seq > 1 \<Longrightarrow> \<not>is_terminal N engagements prop_idxs"
+    proof
+      assume "is_terminal N engagements prop_idxs"
+      hence "length ?seq = 1" by auto
+      moreover assume "length ?seq > 1"
+      ultimately show False by auto
+    qed
   qed
 qed
 
@@ -1210,4 +1211,40 @@ proof -
   moreover have "is_bounded X" using GS'_arg_seq_all_bounded[OF refl assms(1) i_bound seq_i] .
   ultimately show ?thesis using is_matching_intro[of X] result l by fast
 qed
+
+abbreviation unstable where
+"unstable MPrefs WPrefs engagements \<equiv> 
+ \<exists>m1 m2 w1 w2. m1 < length engagements \<and> m2 < length engagements 
+             \<and> engagements!m1 = Some w1 \<and> engagements!m2 = Some w2
+             \<and> prefers w1 WPrefs m2 m1 \<and> prefers m2 MPrefs w1 w2"
+(*
+a rough plan of what i will do:
+
+from the above, show False.
+
+lemmas and todos
+1. strengthen married_once_proposed_to to say, not only is w married once proposed to,
+the fiance she is married to (we only have \<noteq> none now, should have = some m) m, is either
+the man who just proposed (equal), or a man she prefers over m.
+2. prove the lemma that, if at any point w is married to m, then prop_idx!m - 1 points to w.
+  this is the tricky bit:
+  if a man is married to w, he must have proposed to w.
+  in other words if a man has not proposed to w, then he cannot be married to w.
+  you can prove this!
+  if for everything earlier in the sequence, not (freeman = m \<and> MPrefs!m!prop_idx!m = w),
+  then currently, m cannot be with w.
+  prove this by induction across the sequence.
+  base case: m is already not with w. (all None)
+  suc case: m is not currently with w. also, not (freeman = m \<and> MPrefs!m!prop_idx!m = w).
+  then in the next step m cannot possibly be with w.
+  a bit tricky and need to discuss cases, but can be done.
+3. and thus with all_prev_prop_idx_exists we can show that the point where m2 proposed to
+w1 exists. (the prop_idx that points to w1 for m2 exists).
+4. use married_once_proposed_to to show that immediately after this, w1 is married to some guy _
+at least as good as m2. (=m2 or prefers w1 WPrefs _ m2)
+5. use marry_better to show that either m1 = _ or w1 prefers m1 over _.
+6. m1 = _: then either m1=m2 (false) or prefers w1 m1 m2 (false by antisymmetry)
+7. m1 > _: then either m1>m2 (false as above) or m1>m2 by prefers_trans (false as above)
+*)
+
 end
