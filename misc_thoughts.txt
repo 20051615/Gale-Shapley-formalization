@@ -5,8 +5,9 @@ fringe/extensions
 
 do
 -keep lines in .thy under the length limit by breaking
+-also add spaces (paragraph gaps) wherever reasonable to improve readability
 -use [OF _] where possible 
--use try0 everywhere to shorten proofs
+-use try0 everywhere to shorten/speedup proofs
 -unify gs'-arg-seq to all use index form
 -remove unnecessary uses of ?seq eg where they are only used in `seq=?seq`
 -replace all instances of seq!i=(X,Y) with fst(seq!i) snd(seq!i)
