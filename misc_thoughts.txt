@@ -13,6 +13,7 @@ do
 -replace all instances of seq!i=(X,Y) with fst(seq!i) snd(seq!i)
 	actually no, on second thought, why dont I instead use X,Y everywhere? in the statement of lemmas too. change all fst(seq!i) (snd(seq!i) TO XY?
 -organize using <sections> functionality
+	alternatively, at least reorder contents in my .thy into something organized and reasonable
 -eventually: remove unused lemmas
 -a stable match is: counter example doesnt exist (no instability) + actually is a match (everyone gets married) (no one is married to 2 diff people) (ie a bijection)
 -run codegen for evaluation purposes?

@@ -145,6 +145,7 @@ lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagement
 fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
 "findPerson ps p = find_idx p ps"
 lemma findPerson_Some:"findPerson ps p \<noteq> None \<longleftrightarrow> p \<in> set ps" using find_idx_Some[of p ps] by simp
+lemma findPerson:"findPerson ps p = Some idx \<Longrightarrow> ps!idx = p" using find_idx[of p ps idx] by simp
 
 fun prefers::"person \<Rightarrow> pref_matrix \<Rightarrow> person \<Rightarrow> person \<Rightarrow> bool" where
 "prefers p PPrefs p1 p2 = (
@@ -812,7 +813,25 @@ proof -
   with GS'_arg_seq_step_1[OF assms(1-3,5-7)] assms(4) show ?thesis by simp
 qed
 
-lemma GS'_arg_seq_
+lemma GS'_arg_seq_findFiance_2:
+  assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" and "is_distinct engagements"
+      and "Suc i < length seq" and "seq!i = (X, Y)" and "seq!Suc i = (X_next, Y_next)"
+      and "findFreeMan X = Some m" and "w = MPrefs!m!(Y!m)"
+      and "findFiance X w = Some m'" and "prefers w WPrefs m m'"
+    shows "findFiance X_next w = Some m"
+proof -
+  from findFiance[OF assms(8)] findFreeMan[OF assms(6)] have "m' \<noteq> m" by fastforce
+  from findFiance[OF assms(8)] findFiance_bound[OF assms(8)] 
+    GS'_arg_seq_all_distinct[OF assms(1,2) Suc_lessD[OF assms(3)] assms(4)]
+  have "\<forall>m''. (m''\<noteq>m' \<and> m''<length X) \<longrightarrow> X!m'' \<noteq> Some w" by fastforce
+  hence "\<forall>m''<length X. X[m':=None]!m'' \<noteq> Some w" 
+    using findFiance_bound[OF assms(8)] by (simp add:nth_list_update)
+  hence "\<forall>m''<m. X[m:=Some w, m':=None]!m'' \<noteq> Some w" 
+    using `m'\<noteq>m` findFreeMan_bound[OF assms(6)] by (simp add:list_update_swap)
+  hence "findFiance (X[m:=Some w, m':=None]) w = Some m"
+    using `m'\<noteq>m` findFreeMan_bound[OF assms(6)] findFiance_first_is_Some by simp
+  with GS'_arg_seq_step_2[OF assms(1,3,4,6-9)] assms(5) show ?thesis by simp
+qed
 
 lemma GS'_arg_seq_all_w_marry_better:
 "\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs; is_distinct engagements; 
@@ -855,22 +874,14 @@ next
       show ?thesis
       proof (cases "prefers ?w WPrefs m m'")
         case True
-        let ?X_post = "X_po_prev[m:=Some ?w, m':=None]"
-        have "married_better w WPrefs X_po_prev ?X_post"
+        show "married_better w WPrefs X_po_prev X_post"
         proof cases
           assume "w = ?w"
-          from findFiance[OF Some] findFreeMan[OF m] have "m' \<noteq> m" by fastforce
-          from findFiance[OF Some] findFiance_bound[OF Some] 
-            GS'_arg_seq_all_distinct[OF Suc.prems(1-2) Suc_lessD seq_j_1] j_1 Suc.prems(5)
-          have "\<forall>m''. (m''\<noteq>m' \<and> m''<length X_po_prev) \<longrightarrow> X_po_prev!m'' \<noteq> Some ?w" by fastforce
-          hence "\<forall>m''<length X_po_prev. X_po_prev[m':=None]!m'' \<noteq> Some ?w" 
-            using findFiance_bound[OF Some] by (simp add: nth_list_update)
-          hence "\<forall>m''<m. ?X_post!m'' \<noteq> Some ?w" 
-            using `m'\<noteq>m` findFreeMan_bound[OF m] by (simp add:list_update_swap)
-          hence "findFiance ?X_post ?w = Some m"
-            using `m'\<noteq>m` findFreeMan_bound[OF m] findFiance_first_is_Some by simp
-          with `w=?w` Some True show ?thesis by simp
+          moreover from GS'_arg_seq_findFiance_2[OF Suc.prems(1,2) _ seq_j_1 _ m refl Some True] 
+            j_1 Suc.prems(5,6) have "findFiance X_post ?w = Some m" by blast
+          ultimately show ?thesis using Some True by simp
         next
+          let ?X_post = "X_po_prev[m:=Some ?w, m':=None]"
           assume "w \<noteq> ?w"
           with findFiance_Some_is_first[OF m_w] findFreeMan_bound[OF m] findFiance_bound[OF Some]
           have "\<forall>m''<m_w. ?X_post!m'' \<noteq> Some w" by (simp add:nth_list_update)
@@ -881,10 +892,9 @@ next
           qed
           ultimately have "findFiance ?X_post w = Some m_w"
             using findFiance_bound[OF m_w] findFiance_first_is_Some by simp
-          with m_w show ?thesis by simp
+          with GS'_arg_seq_step_2[OF Suc.prems(1) _ seq_j_1 m refl Some True] 
+            Suc.prems(5,6) j_1 m_w show ?thesis by fastforce
         qed
-        with GS'_arg_seq_step_2[OF Suc.prems(1) _ seq_j_1 m refl Some True] Suc.prems(5,6) j_1
-        show ?thesis by simp
       next
         case False
         from GS'_arg_seq_step_3[OF Suc.prems(1) _ seq_j_1 m refl Some this] Suc.prems(5,6) j_1
@@ -979,36 +989,22 @@ next
 qed
 
 lemma GS'_arg_seq_married_once_proposed_to:
-  assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs"
+  assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" and "is_distinct engagements"
       and "Suc i < length seq" and "seq!i = (X, Y)" and "seq!Suc i = (X_next, Y_next)"
       and m:"findFreeMan X = Some m" and "w = MPrefs!m!(Y!m)"
-    shows "\<exists>m'. findFiance X_next w = Some m' \<and> (m' = m \<or> prefers w WPrefs m' m)"
+    shows "\<exists>m'. findFiance X_next w = Some m' \<and> (m' = m \<or> \<not>prefers w WPrefs m m')"
 proof (cases "findFiance X w")
   case None
-  from GS'_arg_seq_step_1[OF assms(1-3,5,6) None] assms(4) have "X_next = X[m:=Some w]" by simp
-
+  from GS'_arg_seq_findFiance_1[OF assms(1,3-7) None] show ?thesis by blast
+next
+  case (Some m')
   show ?thesis
-  proof (cases "findFiance X ?w")
-    case None
-    from GS'_arg_seq_step_1[OF assms(1-3,5) refl None] assms(4) 
-    have "X_next = X[m:=Some ?w]" by auto
-    with findFreeMan_bound[OF m] have "Some ?w \<in> set X_next" by (simp add:set_update_memI)
-    thus ?thesis using findFiance_None by simp
+  proof (cases "prefers w WPrefs m m'")
+    case True
+    from GS'_arg_seq_findFiance_2[OF assms(1-7) Some True] show ?thesis by blast
   next
-    case (Some m')
-    show ?thesis
-    proof (cases "prefers ?w WPrefs m m'")
-      case True
-      from GS'_arg_seq_step_2[OF assms(1-3,5) refl Some True] assms(4)
-      have "X_next = X[m:=Some ?w, m':=None]" by fastforce
-      moreover from findFreeMan[OF m] findFiance[OF Some] have "m \<noteq> m'" by fastforce
-      ultimately have "Some ?w \<in> set X_next" 
-        using findFreeMan_bound[OF m] by (simp add:list_update_swap set_update_memI)
-      thus ?thesis using findFiance_None by simp
-    next
-      case False
-      from GS'_arg_seq_step_3[OF assms(1-3,5) refl Some this] assms(4) Some show ?thesis by auto
-    qed
+    case False
+    with GS'_arg_seq_step_3[OF assms(1,3,4,6,7) Some this] assms(5) Some show ?thesis by fastforce
   qed
 qed
 
@@ -1019,6 +1015,7 @@ lemma GS'_arg_seq_any_man_done_proposing_means_done:
     shows "findFreeMan engagements = None"
 proof -
   let ?Some_Ns = "map Some [0 ..< N]"
+  have distinct:"is_distinct (replicate N None)" by simp
   have "\<forall>prop_idx < length (MPrefs!m). findFiance engagements (MPrefs!m!prop_idx) \<noteq> None"
     apply (rule)
   proof
@@ -1030,15 +1027,12 @@ proof -
     from GS'_arg_seq_all_prev_prop_idxs_exist[OF assms(1,3-6) this] obtain j X_prev Y_prev X' Y'
       where "j < i" and "seq!j = (X_prev, Y_prev)" and X_Y:"seq!Suc j = (X', Y')" 
         and "findFreeMan X_prev = Some m" and "Y_prev!m = prop_idx" by fastforce
-    from GS'_arg_seq_married_once_proposed_to[OF assms(1) less_trans_Suc[OF this(1) assms(3)]
-        this(2-4)] this(5) have "findFiance X' ?w \<noteq> None" by fastforce
-    moreover have "married_better ?w WPrefs X' engagements"
-    proof -
-      from `j<i` have "Suc j \<le> i" by linarith
-      moreover have "is_distinct (replicate N None)" by simp
-      ultimately show ?thesis using GS'_arg_seq_all_w_marry_better[OF assms(1) _ 
-                                    less_trans_Suc[OF `j<i` assms(3)] X_Y assms(3-4)] by blast
-    qed
+    from GS'_arg_seq_married_once_proposed_to[OF assms(1) distinct 
+        less_trans_Suc[OF this(1) assms(3)] this(2-4)] this(5) 
+    have "findFiance X' ?w \<noteq> None" by fastforce
+    moreover have "married_better ?w WPrefs X' engagements" 
+      using GS'_arg_seq_all_w_marry_better[OF assms(1) distinct less_trans_Suc[OF `j<i` assms(3)] 
+          X_Y assms(3,4) Suc_leI[OF `j<i`]] by fast
     ultimately show "findFiance engagements ?w \<noteq> None" using married_better_imp by blast
   qed
   hence "\<forall>w \<in> set [0 ..< N]. findFiance engagements w \<noteq> None" 
@@ -1238,15 +1232,26 @@ abbreviation unstable where
  \<exists>m1 m2 w1 w2. m1 < length engagements \<and> m2 < length engagements 
              \<and> engagements!m1 = Some w1 \<and> engagements!m2 = Some w2
              \<and> prefers w1 WPrefs m2 m1 \<and> prefers m2 MPrefs w1 w2"
+
+lemma prefers_linear_antisym:
+  assumes "is_valid_pref_matrix N PPrefs" and "p < N" and "p1 < N" and "p2 < N" and "p1 \<noteq> p2"
+  shows "(prefers p PPrefs p1 p2 \<or> prefers p PPrefs p2 p1)
+       \<and> (prefers p PPrefs p1 p2 \<longleftrightarrow> \<not>prefers p PPrefs p2 p1)"
+proof -
+  from perm_set_eq[OF perm_PPref[OF assms(1,2)]] findPerson_Some in_upt assms(3,4)
+  obtain idx_1 idx_2 where "findPerson (PPrefs!p) p1 = Some idx_1" 
+                        and "findPerson (PPrefs!p) p2 = Some idx_2" by fastforce
+  moreover from `p1\<noteq>p2` findPerson[OF this(1)] findPerson[OF this(2)] 
+  have "idx_1 \<noteq> idx_2" by blast
+  ultimately show ?thesis by fastforce
+qed
+
 (*
 a rough plan of what i will do:
 
 from the above, show False.
 
 lemmas and todos
-1. strengthen married_once_proposed_to to say, not only is w married once proposed to,
-the fiance she is married to (we only have \<noteq> none now, should have = some m) m, is either
-the man who just proposed (equal), or a man she prefers over m.
 2. prove the lemma that, if at any point w is married to m, then prop_idx!m - 1 points to w.
   this is the tricky bit:
   if a man is married to w, he must have proposed to w.
