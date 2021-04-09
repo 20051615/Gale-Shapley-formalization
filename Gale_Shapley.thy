@@ -18,8 +18,20 @@ fun is_valid_pref_matrix::"nat \<Rightarrow> pref_matrix \<Rightarrow> bool" whe
 value "is_valid_pref_matrix 2 [[0, 1], [1, 0]]"
 value "is_valid_pref_matrix 2 [[0, 0], [1, 0]]"
 lemma length_PPrefs:"is_valid_pref_matrix N PPrefs \<Longrightarrow> length PPrefs = N" by simp
-lemma perm_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; m < N\<rbrakk> \<Longrightarrow> PPrefs!m <~~> [0 ..< N]" 
+lemma perm_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; p < N\<rbrakk> \<Longrightarrow> PPrefs!p <~~> [0 ..< N]" 
   using is_perm nth_mem by fastforce
+lemma length_PPref:"\<lbrakk>is_valid_pref_matrix N PPrefs; p < N\<rbrakk> \<Longrightarrow> length (PPrefs!p) = N" 
+  using perm_length[OF perm_PPref[of N PPrefs p]] by simp
+lemma PPref_inject:
+  assumes "is_valid_pref_matrix N PPrefs" and "p < N" and "idx1 < N" and "idx2 < N" 
+      and "PPrefs!p!idx1 = PPrefs!p!idx2"
+    shows "idx1 = idx2"
+proof -
+  from length_PPref[OF assms(1,2)] assms(3,4) 
+  have "idx1 < length (PPrefs!p)" and "idx2 < length (PPrefs!p)" by simp_all
+  moreover from perm_distinct_iff[OF perm_PPref[OF assms(1,2)]] have "distinct (PPrefs!p)" by simp
+  ultimately show ?thesis using nth_eq_iff_index_eq assms(5) by blast
+qed
 
 fun find_idx::"'a \<Rightarrow> 'a list \<Rightarrow> nat option" where
 "find_idx _ [] = None" |
@@ -144,6 +156,8 @@ lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagement
 
 fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
 "findPerson ps p = find_idx p ps"
+lemma findPerson_bound:"findPerson ps p = Some idx \<Longrightarrow> idx < length ps" 
+  using find_idx_bound[of p ps idx] by simp
 lemma findPerson_Some:"findPerson ps p \<noteq> None \<longleftrightarrow> p \<in> set ps" using find_idx_Some[of p ps] by simp
 lemma findPerson:"findPerson ps p = Some idx \<Longrightarrow> ps!idx = p" using find_idx[of p ps idx] by simp
 
@@ -153,6 +167,10 @@ case findPerson (PPrefs!p) p1 of None \<Rightarrow> False |
                                  Some idx_1 \<Rightarrow> (
   case findPerson (PPrefs!p) p2 of None \<Rightarrow> False |
                                    Some idx_2 \<Rightarrow> idx_1 < idx_2))"
+
+lemma prefers_non_refl:"\<not>prefers p PPrefs p' p'"
+  apply (cases "findPerson (PPrefs!p) p'")
+  by auto
 
 lemma prefers_trans:
   assumes 12:"prefers p PPrefs p1 p2" and 23:"prefers p PPrefs p2 p3"
@@ -992,7 +1010,7 @@ lemma GS'_arg_seq_married_once_proposed_to:
   assumes "seq = GS'_arg_seq N MPrefs WPrefs engagements prop_idxs" and "is_distinct engagements"
       and "Suc i < length seq" and "seq!i = (X, Y)" and "seq!Suc i = (X_next, Y_next)"
       and m:"findFreeMan X = Some m" and "w = MPrefs!m!(Y!m)"
-    shows "\<exists>m'. findFiance X_next w = Some m' \<and> (m' = m \<or> \<not>prefers w WPrefs m m')"
+    shows "\<exists>m'. findFiance X_next w = Some m' \<and> (m' = m \<or> m' \<noteq> m \<and> \<not>prefers w WPrefs m m')"
 proof (cases "findFiance X w")
   case None
   from GS'_arg_seq_findFiance_1[OF assms(1,3-7) None] show ?thesis by blast
@@ -1233,7 +1251,7 @@ abbreviation unstable where
              \<and> engagements!m1 = Some w1 \<and> engagements!m2 = Some w2
              \<and> prefers w1 WPrefs m2 m1 \<and> prefers m2 MPrefs w1 w2"
 
-lemma prefers_linear_antisym:
+lemma prefers_total_antisym:
   assumes "is_valid_pref_matrix N PPrefs" and "p < N" and "p1 < N" and "p2 < N" and "p1 \<noteq> p2"
   shows "(prefers p PPrefs p1 p2 \<or> prefers p PPrefs p2 p1)
        \<and> (prefers p PPrefs p1 p2 \<longleftrightarrow> \<not>prefers p PPrefs p2 p1)"
@@ -1246,31 +1264,161 @@ proof -
   ultimately show ?thesis by fastforce
 qed
 
-(*
-a rough plan of what i will do:
+lemma GS'_arg_seq_be_brave:
+"\<lbrakk>seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) prop_idxs; i < length seq; seq!i = (X, Y);
+  \<nexists>j X' Y'. j < i \<and> seq!j = (X', Y') \<and> findFreeMan X' = Some m \<and> MPrefs!m!(Y'!m) = w; m < N\<rbrakk>
+   \<Longrightarrow> X!m \<noteq> Some w"
+proof (induction i arbitrary:X Y)
+  case 0
+  from "0.prems"(1,3,5) show ?case by (auto simp del:GS'_arg_seq.simps)
+next
+  case (Suc i)
+  obtain X_prev Y_prev where seq_i:"seq!i = (X_prev, Y_prev)" by fastforce
+  have "\<nexists>j X' Y'. j < i \<and> seq!j = (X', Y') \<and> findFreeMan X' = Some m \<and> MPrefs!m!(Y'!m) = w"
+    using Suc.prems(4) less_SucI by blast 
+  from Suc.IH[OF Suc.prems(1) Suc_lessD[OF Suc.prems(2)] seq_i this Suc.prems(5)] 
+  have IH:"X_prev!m \<noteq> Some w" .
+  have prem:"\<not>(findFreeMan X_prev = Some m \<and> MPrefs!m!(Y_prev!m) = w)" 
+    using Suc.prems(4) seq_i by blast
+  from GS'_arg_seq_last_eq_terminal[OF Suc.prems(1) Suc_lessD[OF Suc.prems(2)] seq_i] Suc.prems(2)
+  have "\<not>is_terminal N X_prev Y_prev" by simp
+  then obtain m_prev where m_prev:"findFreeMan X_prev = Some m_prev" by blast
+  let ?w = "MPrefs!m_prev!(Y_prev!m_prev)"
+  show ?case
+  proof (cases "findFiance X_prev ?w")
+    case None
+    from GS'_arg_seq_step_1[OF Suc.prems(1,2) seq_i m_prev refl None] Suc.prems(3)
+    have X:"X = X_prev[m_prev:=Some ?w]" by simp
+    show ?thesis
+    proof (cases "m = m_prev")
+      case True
+      with m_prev prem X findFreeMan_bound[OF m_prev] show ?thesis by simp
+    next
+      case False
+      with IH X show ?thesis by simp
+    qed
+  next
+    case (Some m')
+    show ?thesis
+    proof (cases "prefers ?w WPrefs m_prev m'")
+      case True
+      from GS'_arg_seq_step_2[OF Suc.prems(1,2) seq_i m_prev refl Some True] Suc.prems(3)
+      have X:"X = X_prev[m_prev:=Some ?w, m':=None]" by simp
+      show ?thesis
+      proof cases
+        assume "m = m_prev"
+        moreover hence "Some ?w \<noteq> Some w" using prem m_prev by blast
+        moreover from findFreeMan[OF m_prev] findFiance[OF Some] have "m_prev \<noteq> m'" by auto
+        ultimately show ?thesis using X findFreeMan_bound[OF m_prev] by simp
+      next
+        assume "m \<noteq> m_prev"
+        show ?thesis
+        proof cases
+          assume "m = m'"
+          with findFiance_bound[OF Some] X show ?thesis by simp
+        next
+          assume "m \<noteq> m'"
+          with `m\<noteq>m_prev` IH X show ?thesis by auto
+        qed
+      qed
+    next
+      case False
+      from GS'_arg_seq_step_3[OF Suc.prems(1,2) seq_i m_prev refl Some this] Suc.prems(3) IH
+      show ?thesis by simp
+    qed
+  qed
+qed
 
-from the above, show False.
+theorem GS'_arg_seq_all_stable:
+  assumes "seq = GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)" 
+      and "is_valid_pref_matrix N MPrefs" and "is_valid_pref_matrix N WPrefs"
+      and "i < length seq" and "seq!i = (X, Y)"
+    shows "\<not> unstable MPrefs WPrefs X"
+proof
+  assume "unstable MPrefs WPrefs X"
+  moreover from GS'_arg_seq_length_fst[OF assms(1,4,5)] have "length X = N" by simp
+  ultimately obtain m1 m2 w1 w2 where "m1 < N" and "m2 < N" 
+    and "X!m1 = Some w1" and "X!m2 = Some w2" 
+    and w1_m2:"prefers w1 WPrefs m2 m1" and m2_w1:"prefers m2 MPrefs w1 w2" by blast
+  from GS'_arg_seq_be_brave[OF assms(1,4,5) _ `m2<N`] this(4) obtain j_m2_w2 X_m2_w2 Y_m2_w2
+    where "j_m2_w2 < i" and seq_m2_w2:"seq!j_m2_w2 = (X_m2_w2, Y_m2_w2)" 
+      and Y_m2_w2:"w2 = MPrefs!m2!(Y_m2_w2!m2)" by metis
+  from GS'_arg_seq_last_eq_terminal[OF assms(1) order.strict_trans[OF this(1) assms(4)] this(2)]
+    assms(4) this(1) have "\<not>is_terminal N X_m2_w2 Y_m2_w2" by simp
+  from GS'_arg_seq_prop_idx_bound_non_terminal[OF assms(1,2) 
+      order.strict_trans[OF `j_m2_w2<i` assms(4)] seq_m2_w2 `m2<N` this] have "Y_m2_w2!m2 < N" .
+  obtain idx_m2_w1 where idx_m2_w1:"findPerson (MPrefs!m2) w1 = Some idx_m2_w1"
+    using m2_w1 by fastforce
+  then obtain idx_m2_w2 where idx_m2_w2:"findPerson (MPrefs!m2) w2 = Some idx_m2_w2" 
+    using m2_w1 by fastforce
+  from length_PPref[OF assms(2) `m2<N`] findPerson_bound[OF this] have "idx_m2_w2 < N" by simp
+  from PPref_inject[OF assms(2) `m2<N` `Y_m2_w2!m2<N` this] Y_m2_w2 findPerson[OF idx_m2_w2]
+  have "Y_m2_w2!m2 = idx_m2_w2" by presburger
+  moreover from m2_w1 idx_m2_w1 idx_m2_w2 have "idx_m2_w1 < idx_m2_w2" by simp
+  ultimately obtain j_m2_w1 X_m2_w1 Y_m2_w1 where "j_m2_w1 < j_m2_w2" 
+    and "seq!j_m2_w1 = (X_m2_w1, Y_m2_w1)" and "Y_m2_w1!m2 = idx_m2_w1" 
+    and "findFreeMan X_m2_w1 = Some m2" using GS'_arg_seq_all_prev_prop_idxs_exist[OF assms(1)
+        order.strict_trans[OF `j_m2_w2<i` assms(4)] seq_m2_w2 `m2<N`] by blast
+  moreover have distinct:"is_distinct (replicate N None)" by simp
+  moreover from order.strict_trans[OF `j_m2_w1<j_m2_w2` `j_m2_w2<i`] assms(4) 
+  have "Suc j_m2_w1 < length seq" by fastforce 
+  moreover obtain X_m2_w1_Suc Y_m2_w1_Suc 
+    where seq_m2_w1_Suc:"seq!Suc j_m2_w1 = (X_m2_w1_Suc, Y_m2_w1_Suc)" by fastforce
+  ultimately obtain m' where m':"findFiance X_m2_w1_Suc w1 = Some m'" 
+    and cases_1:"(m' = m2 \<or> m' \<noteq> m2 \<and> \<not> prefers w1 WPrefs m2 m')"
+    using GS'_arg_seq_married_once_proposed_to[OF assms(1)] findPerson[OF idx_m2_w1] by blast
+  from married_better_imp[OF this(1) GS'_arg_seq_all_w_marry_better[OF assms(1) distinct 
+        `Suc j_m2_w1<length seq` seq_m2_w1_Suc assms(4,5) Suc_leI[OF 
+          order.strict_trans[OF `j_m2_w1<j_m2_w2` `j_m2_w2<i`]]]] 
+  obtain m1' where "findFiance X w1 = Some m1'" and "m' = m1' \<or> prefers w1 WPrefs m1' m'" by blast
+  from GS'_arg_seq_all_distinct[OF assms(1) distinct assms(4,5)] findFiance[OF this(1)] 
+    `X!m1=Some w1` findFiance_bound[OF this(1)] `m1<N` `length X=N` this(2)
+  have cases_2:"m' = m1 \<or> prefers w1 WPrefs m1 m'" by fastforce
+  from findFiance_bound[OF m'] GS'_arg_seq_length_fst[OF assms(1) `Suc j_m2_w1<length seq` 
+      seq_m2_w1_Suc] have "m' < N" by simp
+  from findPerson[OF idx_m2_w1] findPerson_bound[OF idx_m2_w1] 
+    perm_set_eq[OF perm_PPref[OF assms(2) `m2<N`]] in_upt have "w1 < N" by (metis nth_mem)
+  from cases_1 show False
+  proof
+    assume "m' = m2"
+    from cases_2 show False
+    proof
+      assume "m' = m1"
+      with `m'=m2` w1_m2 show False using prefers_non_refl by blast
+    next
+      assume "prefers w1 WPrefs m1 m'"
+      with `m'=m2` prefers_total_antisym[OF assms(3) `w1<N` `m1<N` `m2<N`] w1_m2 prefers_non_refl
+      show False by blast
+    qed
+  next
+    assume "m' \<noteq> m2 \<and> \<not> prefers w1 WPrefs m2 m'"
+    with prefers_total_antisym[OF assms(3) `w1<N` `m2<N` `m'<N`] 
+    have w1_m':"prefers w1 WPrefs m' m2" by blast
+    from cases_2 show False
+    proof
+      assume "m' = m1"
+      with prefers_trans[OF w1_m' w1_m2] prefers_non_refl show False by fast
+    next
+      assume "prefers w1 WPrefs m1 m'"
+      from prefers_trans[OF this w1_m'] prefers_total_antisym[OF assms(3) `w1<N` `m1<N` `m2<N`] 
+        w1_m2 prefers_non_refl show False by blast
+    qed
+  qed
+qed
 
-lemmas and todos
-2. prove the lemma that, if at any point w is married to m, then prop_idx!m - 1 points to w.
-  this is the tricky bit:
-  if a man is married to w, he must have proposed to w.
-  in other words if a man has not proposed to w, then he cannot be married to w.
-  you can prove this!
-  if for everything earlier in the sequence, not (freeman = m \<and> MPrefs!m!prop_idx!m = w),
-  then currently, m cannot be with w.
-  prove this by induction across the sequence.
-  base case: m is already not with w. (all None)
-  suc case: m is not currently with w. also, not (freeman = m \<and> MPrefs!m!prop_idx!m = w).
-  then in the next step m cannot possibly be with w.
-  a bit tricky and need to discuss cases, but can be done.
-3. and thus with all_prev_prop_idx_exists we can show that the point where m2 proposed to
-w1 exists. (the prop_idx that points to w1 for m2 exists).
-4. use married_once_proposed_to to show that immediately after this, w1 is married to some guy _
-at least as good as m2. (=m2 or prefers w1 WPrefs _ m2)
-5. use marry_better to show that either m1 = _ or w1 prefers m1 over _.
-6. m1 = _: then either m1=m2 (false) or prefers w1 m1 m2 (false by antisymmetry)
-7. m1 > _: then either m1>m2 (false as above) or m1>m2 by prefers_trans (false as above)
-*)
+theorem stable:
+  assumes "is_valid_pref_matrix N MPrefs" and "is_valid_pref_matrix N WPrefs"
+  shows "\<not> unstable MPrefs WPrefs (Gale_Shapley MPrefs WPrefs)"
+proof -
+  let ?seq = "GS'_arg_seq N MPrefs WPrefs (replicate N None) (replicate N 0)"
+  from GS'_arg_seq_length_gr_0 obtain i where i:"length ?seq = Suc i" 
+    using not0_implies_Suc by blast
+  hence i_bound:"i < length ?seq" by simp
+  obtain X Y where seq_i:"?seq!i = (X, Y)" by fastforce
 
+  from length_PPrefs[OF assms(1)] have "Gale_Shapley MPrefs WPrefs 
+                 = Gale_Shapley' N MPrefs WPrefs (replicate N None) (replicate N 0)" by simp
+  also have "... = X" using GS'_arg_seq_computes_GS'[OF refl i seq_i] by presburger
+  finally show ?thesis using GS'_arg_seq_all_stable[OF refl assms i_bound seq_i] by simp
+qed
 end
