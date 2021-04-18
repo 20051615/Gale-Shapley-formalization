@@ -4,6 +4,7 @@ fringe/extensions
 -split GS.thy into multiple files???
 
 do
+-prove the lemma that engagements!m=Some w IFF findFiance w engagements = Some m (given is_distinct fst(seq!0)). and make use of this lemma where possible
 -keep lines in .thy under the length limit by breaking
 -also add spaces (paragraph gaps) wherever reasonable to improve readability
 -use [OF _] where possible 
