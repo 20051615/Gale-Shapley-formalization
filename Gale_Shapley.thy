@@ -154,31 +154,24 @@ lemma findFiance_first_is_Some:
 lemma findFiance:"findFiance engagements w = Some m \<Longrightarrow> engagements!m = Some w" 
   using find_idx[of "Some w" engagements m] by simp
 
-fun findPerson::"person list \<Rightarrow> person \<Rightarrow> nat option" where
-"findPerson ps p = find_idx p ps"
-lemma findPerson_bound:"findPerson ps p = Some idx \<Longrightarrow> idx < length ps" 
-  using find_idx_bound[of p ps idx] by simp
-lemma findPerson_Some:"findPerson ps p \<noteq> None \<longleftrightarrow> p \<in> set ps" using find_idx_Some[of p ps] by simp
-lemma findPerson:"findPerson ps p = Some idx \<Longrightarrow> ps!idx = p" using find_idx[of p ps idx] by simp
-
 fun prefers::"person \<Rightarrow> pref_matrix \<Rightarrow> person \<Rightarrow> person \<Rightarrow> bool" where
 "prefers p PPrefs p1 p2 = (
-case findPerson (PPrefs!p) p1 of None \<Rightarrow> False |
-                                 Some idx_1 \<Rightarrow> (
-  case findPerson (PPrefs!p) p2 of None \<Rightarrow> False |
-                                   Some idx_2 \<Rightarrow> idx_1 < idx_2))"
+case find_idx p1 (PPrefs!p) of None \<Rightarrow> False |
+                               Some idx_1 \<Rightarrow> (
+  case find_idx p2 (PPrefs!p) of None \<Rightarrow> False |
+                                 Some idx_2 \<Rightarrow> idx_1 < idx_2))"
 
 lemma prefers_non_refl:"\<not>prefers p PPrefs p' p'"
-  apply (cases "findPerson (PPrefs!p) p'")
+  apply (cases "find_idx p' (PPrefs!p)")
   by auto
 
 lemma prefers_trans:
   assumes 12:"prefers p PPrefs p1 p2" and 23:"prefers p PPrefs p2 p3"
   shows "prefers p PPrefs p1 p3"
 proof -
-  from 12 obtain idx_1 where idx_1:"findPerson (PPrefs!p) p1 = Some idx_1" by fastforce
-  from 23 obtain idx_2 where idx_2:"findPerson (PPrefs!p) p2 = Some idx_2" by fastforce
-  with 23 obtain idx_3 where idx_3:"findPerson (PPrefs!p) p3 = Some idx_3" by fastforce
+  from 12 obtain idx_1 where idx_1:"find_idx p1 (PPrefs!p) = Some idx_1" by fastforce
+  from 23 obtain idx_2 where idx_2:"find_idx p2 (PPrefs!p) = Some idx_2" by fastforce
+  with 23 obtain idx_3 where idx_3:"find_idx p3 (PPrefs!p) = Some idx_3" by fastforce
   from 12 idx_1 idx_2 have "idx_1 < idx_2" by auto
   moreover from 23 idx_2 idx_3 have "idx_2 < idx_3" by auto
   ultimately show ?thesis using idx_1 idx_3 by fastforce
@@ -1256,10 +1249,11 @@ lemma prefers_total_antisym:
   shows "(prefers p PPrefs p1 p2 \<or> prefers p PPrefs p2 p1)
        \<and> (prefers p PPrefs p1 p2 \<longleftrightarrow> \<not>prefers p PPrefs p2 p1)"
 proof -
-  from perm_set_eq[OF perm_PPref[OF assms(1,2)]] findPerson_Some in_upt assms(3,4)
-  obtain idx_1 idx_2 where "findPerson (PPrefs!p) p1 = Some idx_1" 
-                        and "findPerson (PPrefs!p) p2 = Some idx_2" by fastforce
-  moreover from `p1\<noteq>p2` findPerson[OF this(1)] findPerson[OF this(2)] 
+  from assms(3,4) in_upt[where ?k=N] perm_set_eq[OF perm_PPref[OF assms(1,2)]]
+  have "p1 \<in> set (PPrefs!p) \<and> p2 \<in> set (PPrefs!p)" by blast
+  with find_idx_Some[where ?xs="PPrefs!p"] obtain idx_1 idx_2 
+    where "find_idx p1 (PPrefs!p) = Some idx_1" and "find_idx p2 (PPrefs!p) = Some idx_2" by blast
+  moreover from `p1\<noteq>p2` find_idx[OF this(1)] find_idx[OF this(2)] 
   have "idx_1 \<noteq> idx_2" by blast
   ultimately show ?thesis by fastforce
 qed
@@ -1347,12 +1341,12 @@ proof
     assms(4) this(1) have "\<not>is_terminal N X_m2_w2 Y_m2_w2" by simp
   from GS'_arg_seq_prop_idx_bound_non_terminal[OF assms(1,2) 
       order.strict_trans[OF `j_m2_w2<i` assms(4)] seq_m2_w2 `m2<N` this] have "Y_m2_w2!m2 < N" .
-  obtain idx_m2_w1 where idx_m2_w1:"findPerson (MPrefs!m2) w1 = Some idx_m2_w1"
+  obtain idx_m2_w1 where idx_m2_w1:"find_idx w1 (MPrefs!m2) = Some idx_m2_w1"
     using m2_w1 by fastforce
-  then obtain idx_m2_w2 where idx_m2_w2:"findPerson (MPrefs!m2) w2 = Some idx_m2_w2" 
+  then obtain idx_m2_w2 where idx_m2_w2:"find_idx w2 (MPrefs!m2) = Some idx_m2_w2" 
     using m2_w1 by fastforce
-  from length_PPref[OF assms(2) `m2<N`] findPerson_bound[OF this] have "idx_m2_w2 < N" by simp
-  from PPref_inject[OF assms(2) `m2<N` `Y_m2_w2!m2<N` this] Y_m2_w2 findPerson[OF idx_m2_w2]
+  from length_PPref[OF assms(2) `m2<N`] find_idx_bound[OF this] have "idx_m2_w2 < N" by simp
+  from PPref_inject[OF assms(2) `m2<N` `Y_m2_w2!m2<N` this] Y_m2_w2 find_idx[OF idx_m2_w2]
   have "Y_m2_w2!m2 = idx_m2_w2" by presburger
   moreover from m2_w1 idx_m2_w1 idx_m2_w2 have "idx_m2_w1 < idx_m2_w2" by simp
   ultimately obtain j_m2_w1 X_m2_w1 Y_m2_w1 where "j_m2_w1 < j_m2_w2" 
@@ -1366,7 +1360,7 @@ proof
     where seq_m2_w1_Suc:"seq!Suc j_m2_w1 = (X_m2_w1_Suc, Y_m2_w1_Suc)" by fastforce
   ultimately obtain m' where m':"findFiance X_m2_w1_Suc w1 = Some m'" 
     and cases_1:"(m' = m2 \<or> m' \<noteq> m2 \<and> \<not> prefers w1 WPrefs m2 m')"
-    using GS'_arg_seq_married_once_proposed_to[OF assms(1)] findPerson[OF idx_m2_w1] by blast
+    using GS'_arg_seq_married_once_proposed_to[OF assms(1)] find_idx[OF idx_m2_w1] by blast
   from married_better_imp[OF this(1) GS'_arg_seq_all_w_marry_better[OF assms(1) distinct 
         `Suc j_m2_w1<length seq` seq_m2_w1_Suc assms(4,5) Suc_leI[OF 
           order.strict_trans[OF `j_m2_w1<j_m2_w2` `j_m2_w2<i`]]]] 
@@ -1376,7 +1370,7 @@ proof
   have cases_2:"m' = m1 \<or> prefers w1 WPrefs m1 m'" by fastforce
   from findFiance_bound[OF m'] GS'_arg_seq_length_fst[OF assms(1) `Suc j_m2_w1<length seq` 
       seq_m2_w1_Suc] have "m' < N" by simp
-  from findPerson[OF idx_m2_w1] findPerson_bound[OF idx_m2_w1] 
+  from find_idx[OF idx_m2_w1] find_idx_bound[OF idx_m2_w1] 
     perm_set_eq[OF perm_PPref[OF assms(2) `m2<N`]] in_upt have "w1 < N" by (metis nth_mem)
   from cases_1 show False
   proof
