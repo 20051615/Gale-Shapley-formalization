@@ -752,10 +752,18 @@ next
     show ?thesis
     proof (cases "prefers ?w WPrefs m m'")
       case True
+      let ?X_mid = "X_prev[m':=None]"
       from findFiance[OF Some] findFiance_bound[OF Some] IH
       have "\<forall>m < length X_prev. m \<noteq> m' \<longrightarrow> X_prev!m \<noteq> Some ?w" by fastforce
-      hence "is_distinct (X_prev[m:=Some ?w, m':=None])" 
-        using IH by (metis (full_types) length_list_update nth_list_update nth_list_update_neq)
+      moreover have "?X_mid!m' \<noteq> Some ?w" using findFiance_bound[OF Some] by auto
+      ultimately have "\<forall>m < length ?X_mid. ?X_mid!m \<noteq> Some ?w"
+        by (metis length_list_update nth_list_update_neq)
+      moreover from IH findFiance_bound[OF Some] have "is_distinct ?X_mid"
+        by (metis length_list_update nth_list_update)
+      ultimately have "is_distinct (X_prev[m':=None, m:=Some ?w])" using findFreeMan_bound[OF m]
+        by (metis length_list_update nth_list_update)
+      moreover from findFiance[OF Some] findFreeMan[OF m] have "m \<noteq> m'" by auto
+      ultimately have "is_distinct (X_prev[m:=Some ?w, m':=None])" by (simp add:list_update_swap)
       with GS'_arg_seq_step_2[OF Suc.prems(1,3) seq_i m refl Some True] Suc.prems(4) 
       show ?thesis by simp
     next
